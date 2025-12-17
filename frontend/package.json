@@ -9,5 +9,17 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs"
+  "type": "commonjs",
+  "dependencies": {
+    "@docusaurus/core": "^3.9.2",
+    "@docusaurus/preset-classic": "^3.9.2",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "axios": "^1.13.2",
+    "clsx": "^2.1.1",
+    "docusaurus": "^1.14.7",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
+  }
 }
