@@ -7,8 +7,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const config: Config = {
-  title: 'Physical AI & Humanoid Robotics',
-  tagline: 'Living Textbook with AI Teaching Assistant',
+  title: 'Physical AI & Humanoid Robotics Textbook',
+  tagline: 'Interactive Learning with AI Teaching Assistant',
 
   // Set the production url of your site here
   url: 'https://giaic-hackathone.github.io',
@@ -64,11 +64,7 @@ const config: Config = {
 
   themeConfig: {
     navbar: {
-      title: 'Living Textbook',
-      logo: {
-        alt: 'Physical AI Logo',
-        src: 'img/logo.svg',
-      },
+      title: 'Physical AI & Humanoid Robotics Textbook',
       items: [
         {
           type: 'docSidebar',

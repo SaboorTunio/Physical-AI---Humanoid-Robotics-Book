@@ -11,10 +11,10 @@ function HomepageHeader() {
     <header className={clsx('hero hero--primary', styles.heroBanner)}>
       <div className="container">
         <Heading as="h1" className={styles.heroTitle}>
-          Welcome to the Living Textbook
+          Physical AI & Humanoid Robotics Textbook
         </Heading>
         <Heading as="h2" className={styles.heroSubheading}>
-          Physical AI & Humanoid Robotics
+          Interactive Learning with AI Teaching Assistant
         </Heading>
         <p className={styles.heroSubtitle}>
           An interactive, AI-powered learning platform that combines comprehensive curriculum on Physical AI and Humanoid Robotics with an intelligent Teaching Assistant powered by advanced RAG (Retrieval-Augmented Generation) technology.
