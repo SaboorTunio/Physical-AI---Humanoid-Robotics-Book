@@ -1,0 +1,330 @@
+---
+id: chapter-11-reinforcement-learning
+title: "Chapter 11: Reinforcement Learning Basics"
+description: "Learn reinforcement learning techniques for training robots to learn behaviors through interaction and rewards."
+sidebar_position: 11
+module: 3
+part: 2
+chapter_index: 11
+learning_objectives:
+  - Understand Markov Decision Processes and rewards
+  - Implement Q-learning algorithms
+  - Use policy gradient methods
+  - Train robots in simulation
+  - Handle exploration vs exploitation
+prerequisites: [10]
+keywords:
+  - Reinforcement learning
+  - Q-learning
+  - Policy gradient
+  - Rewards
+  - MDP
+---
+
+# Chapter 11: Reinforcement Learning Basics
+
+## Reinforcement Learning Concepts
+
+```python
+import numpy as np
+
+class Environment:
+    """Simple grid world environment."""
+
+    def __init__(self, grid_size=5):
+        self.grid_size = grid_size
+        self.robot_pos = [0, 0]
+        self.goal_pos = [grid_size-1, grid_size-1]
+
+    def reset(self):
+        self.robot_pos = [0, 0]
+        return self._get_state()
+
+    def _get_state(self):
+        return tuple(self.robot_pos)
+
+    def step(self, action):
+        """
+        Actions: 0=up, 1=right, 2=down, 3=left
+        """
+        dx, dy = [(0, -1), (1, 0), (0, 1), (-1, 0)][action]
+        new_pos = [self.robot_pos[0] + dx, self.robot_pos[1] + dy]
+
+        # Boundary check
+        if 0 <= new_pos[0] < self.grid_size and 0 <= new_pos[1] < self.grid_size:
+            self.robot_pos = new_pos
+
+        state = self._get_state()
+
+        # Reward
+        if state == tuple(self.goal_pos):
+            reward = 1.0
+            done = True
+        else:
+            reward = -0.01  # Small penalty for each step
+            done = False
+
+        return state, reward, done
+
+env = Environment()
+```
+
+## Q-Learning
+
+```python
+class QLearningAgent:
+    """Q-learning for robot navigation."""
+
+    def __init__(self, grid_size=5, learning_rate=0.1, discount=0.9, epsilon=0.1):
+        self.grid_size = grid_size
+        self.lr = learning_rate
+        self.gamma = discount
+        self.epsilon = epsilon
+
+        # Q-table: (x, y, action)
+        self.q_table = {}
+
+    def get_q_value(self, state, action):
+        return self.q_table.get((state, action), 0.0)
+
+    def choose_action(self, state, training=True):
+        """Epsilon-greedy action selection."""
+        if training and np.random.random() < self.epsilon:
+            # Explore
+            return np.random.randint(0, 4)
+        else:
+            # Exploit
+            q_values = [self.get_q_value(state, a) for a in range(4)]
+            return np.argmax(q_values)
+
+    def learn(self, state, action, reward, next_state):
+        """Update Q-value."""
+        current_q = self.get_q_value(state, action)
+
+        # Find max Q for next state
+        max_next_q = max([self.get_q_value(next_state, a) for a in range(4)])
+
+        # Q-learning update
+        new_q = current_q + self.lr * (reward + self.gamma * max_next_q - current_q)
+        self.q_table[(state, action)] = new_q
+
+# Training
+agent = QLearningAgent(grid_size=5)
+env = Environment(grid_size=5)
+
+for episode in range(1000):
+    state = env.reset()
+    done = False
+
+    while not done:
+        action = agent.choose_action(state, training=True)
+        next_state, reward, done = env.step(action)
+        agent.learn(state, action, reward, next_state)
+        state = next_state
+
+    if (episode + 1) % 100 == 0:
+        print(f"Episode {episode + 1} completed")
+
+# Evaluation
+total_reward = 0
+state = env.reset()
+done = False
+
+while not done:
+    action = agent.choose_action(state, training=False)
+    state, reward, done = env.step(action)
+    total_reward += reward
+
+print(f"Total reward: {total_reward}")
+```
+
+## Policy Gradient Methods
+
+```python
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+class PolicyNetwork(nn.Module):
+    """Neural network policy for robot control."""
+
+    def __init__(self, state_dim, action_dim):
+        super(PolicyNetwork, self).__init__()
+
+        self.fc1 = nn.Linear(state_dim, 128)
+        self.fc2 = nn.Linear(128, 64)
+        self.fc3 = nn.Linear(64, action_dim)
+
+        self.relu = nn.ReLU()
+
+    def forward(self, state):
+        x = self.relu(self.fc1(state))
+        x = self.relu(self.fc2(x))
+        action_probs = torch.softmax(self.fc3(x), dim=-1)
+        return action_probs
+
+class PolicyGradientAgent:
+    """REINFORCE algorithm."""
+
+    def __init__(self, state_dim, action_dim, learning_rate=0.01):
+        self.policy = PolicyNetwork(state_dim, action_dim)
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
+
+    def select_action(self, state):
+        state = torch.FloatTensor(state).unsqueeze(0)
+        probs = self.policy(state)
+        m = torch.distributions.Categorical(probs)
+        action = m.sample()
+        return action.item(), m.log_prob(action)
+
+    def train(self, log_probs, rewards):
+        """REINFORCE update."""
+        discounted_rewards = []
+        cumulative = 0
+
+        # Calculate discounted rewards
+        for r in reversed(rewards):
+            cumulative = r + 0.99 * cumulative
+            discounted_rewards.insert(0, cumulative)
+
+        discounted_rewards = torch.FloatTensor(discounted_rewards)
+        discounted_rewards = (discounted_rewards - discounted_rewards.mean()) / (discounted_rewards.std() + 1e-8)
+
+        # Policy gradient loss
+        policy_loss = []
+        for log_prob, reward in zip(log_probs, discounted_rewards):
+            policy_loss.append(-log_prob * reward)
+
+        loss = torch.stack(policy_loss).sum()
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+# Training loop
+agent = PolicyGradientAgent(state_dim=2, action_dim=4)
+
+for episode in range(100):
+    state = env.reset()
+    log_probs = []
+    rewards = []
+    done = False
+
+    while not done:
+        action, log_prob = agent.select_action(state)
+        next_state, reward, done = env.step(action)
+
+        log_probs.append(log_prob)
+        rewards.append(reward)
+        state = next_state
+
+    agent.train(log_probs, rewards)
+
+    if (episode + 1) % 10 == 0:
+        print(f"Episode {episode + 1}")
+```
+
+## Actor-Critic Methods
+
+```python
+class ActorCritic(nn.Module):
+    """Actor-Critic network."""
+
+    def __init__(self, state_dim, action_dim):
+        super(ActorCritic, self).__init__()
+
+        # Shared layers
+        self.fc1 = nn.Linear(state_dim, 128)
+        self.fc2 = nn.Linear(128, 64)
+
+        # Actor (policy)
+        self.actor_head = nn.Linear(64, action_dim)
+
+        # Critic (value)
+        self.critic_head = nn.Linear(64, 1)
+
+        self.relu = nn.ReLU()
+
+    def forward(self, state):
+        x = self.relu(self.fc1(state))
+        x = self.relu(self.fc2(x))
+
+        action_probs = torch.softmax(self.actor_head(x), dim=-1)
+        value = self.critic_head(x)
+
+        return action_probs, value
+
+class ActorCriticAgent:
+    def __init__(self, state_dim, action_dim):
+        self.model = ActorCritic(state_dim, action_dim)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=0.01)
+
+    def train_step(self, state, action, reward, next_state, done):
+        state_t = torch.FloatTensor(state).unsqueeze(0)
+        next_state_t = torch.FloatTensor(next_state).unsqueeze(0)
+
+        # Forward pass
+        action_probs, value = self.model(state_t)
+        _, next_value = self.model(next_state_t)
+
+        # TD error
+        if done:
+            td_error = reward - value.item()
+            next_value_target = 0
+        else:
+            td_error = reward + 0.99 * next_value.item() - value.item()
+            next_value_target = next_value
+
+        # Actor loss
+        action_log_prob = torch.log(action_probs[0, action])
+        actor_loss = -action_log_prob * td_error
+
+        # Critic loss
+        critic_loss = (reward + 0.99 * next_value_target - value) ** 2
+
+        loss = actor_loss + critic_loss
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+```
+
+## Exploration vs Exploitation
+
+```python
+class EpsilonGreedy:
+    """Epsilon-greedy exploration strategy."""
+
+    def __init__(self, epsilon=0.1, epsilon_decay=0.995):
+        self.epsilon = epsilon
+        self.epsilon_decay = epsilon_decay
+
+    def get_action(self, q_values):
+        if np.random.random() < self.epsilon:
+            return np.random.randint(len(q_values))
+        else:
+            return np.argmax(q_values)
+
+    def decay(self):
+        self.epsilon *= self.epsilon_decay
+
+# Usage
+explorer = EpsilonGreedy(epsilon=1.0, epsilon_decay=0.995)
+
+for episode in range(1000):
+    # ... training ...
+    explorer.decay()
+```
+
+## Summary
+
+| Algorithm | Type | Use Case |
+|-----------|------|----------|
+| Q-Learning | Value-based | Small discrete spaces |
+| Policy Gradient | Policy-based | Continuous actions |
+| Actor-Critic | Hybrid | Balanced approach |
+| DQN | Deep RL | Large state spaces |
+
+## Next Steps
+
+The next chapter covers advanced neural network techniques for robot perception and control.

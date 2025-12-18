@@ -1,0 +1,534 @@
+---
+id: chapter-3-math-robotics
+title: "Chapter 3: Mathematics for Robotics"
+description: "Master the mathematical foundations of robotics including vectors, matrices, transformations, and quaternions."
+sidebar_position: 3
+module: 1
+part: 2
+chapter_index: 3
+learning_objectives:
+  - Understand vector and matrix operations
+  - Work with coordinate transformations
+  - Convert between rotation representations (Euler angles, quaternions, rotation matrices)
+  - Apply homogeneous transformations for robot kinematics
+  - Understand trigonometry in robot control
+prerequisites: [1]
+keywords:
+  - Linear algebra
+  - Transformations
+  - Rotations
+  - Quaternions
+  - Homogeneous coordinates
+  - Trigonometry
+---
+
+# Chapter 3: Mathematics for Robotics
+
+## Introduction
+
+Robotics heavily relies on mathematical concepts to describe positions, orientations, and movements. This chapter covers the essential mathematics you need for robot control and kinematics.
+
+## Vectors and Coordinate Systems
+
+### Vector Representation
+
+Vectors represent positions, velocities, and forces in 3D space:
+
+```python
+import numpy as np
+
+# Define vectors
+position = np.array([1.0, 2.0, 3.0])  # x, y, z
+velocity = np.array([0.5, -0.2, 0.1])  # vx, vy, vz
+
+# Vector magnitude (length)
+mag = np.linalg.norm(position)
+print(f"Position magnitude: {mag:.2f}")  # 3.74
+
+# Vector normalization (unit vector)
+unit_vector = position / mag
+print(f"Unit vector: {unit_vector}")
+
+# Dot product (scalar multiplication)
+dot_prod = np.dot(position, velocity)
+print(f"Dot product: {dot_prod:.2f}")
+
+# Cross product (perpendicular vector)
+cross_prod = np.cross(position, velocity)
+print(f"Cross product: {cross_prod}")
+```
+
+### Distance Calculation
+
+```python
+# Distance between two points
+p1 = np.array([0, 0, 0])
+p2 = np.array([3, 4, 0])
+
+distance = np.linalg.norm(p2 - p1)
+print(f"Distance: {distance}")  # 5.0
+
+# Euclidean distance formula
+# d = sqrt((x2-x1)² + (y2-y1)² + (z2-z1)²)
+```
+
+## Matrix Operations
+
+### Basic Matrices
+
+Matrices organize data and perform transformations:
+
+```python
+import numpy as np
+
+# Create matrices
+A = np.array([
+    [1, 2, 3],
+    [4, 5, 6],
+    [7, 8, 9]
+])
+
+B = np.array([
+    [9, 8, 7],
+    [6, 5, 4],
+    [3, 2, 1]
+])
+
+# Element-wise operations
+C = A + B
+D = A - B
+E = A * B  # Element-wise multiplication
+
+# Matrix multiplication (different from element-wise)
+F = np.matmul(A, B)
+print(f"Matrix multiplication result:\n{F}")
+
+# Matrix transpose
+A_T = A.T
+print(f"Transpose of A:\n{A_T}")
+
+# Determinant
+det_A = np.linalg.det(A)
+print(f"Determinant of A: {det_A}")
+
+# Inverse (only for square, non-singular matrices)
+A_inv = np.linalg.inv(A)
+print(f"Inverse of A:\n{A_inv}")
+```
+
+### Identity and Zero Matrices
+
+```python
+# Identity matrix (multiplication doesn't change vectors)
+I = np.eye(3)
+print(f"3x3 Identity matrix:\n{I}")
+
+# Zero matrix
+Z = np.zeros((3, 3))
+print(f"3x3 Zero matrix:\n{Z}")
+
+# Verify: A * I = A
+result = np.matmul(A, I)
+print(f"A * I = A? {np.allclose(A, result)}")
+```
+
+## Rotation Matrices
+
+### 2D Rotations
+
+Rotate points in a 2D plane:
+
+```python
+import numpy as np
+import math
+
+# Rotation matrix for angle theta (counter-clockwise)
+theta = math.pi / 4  # 45 degrees
+
+R_2d = np.array([
+    [math.cos(theta), -math.sin(theta)],
+    [math.sin(theta), math.cos(theta)]
+])
+
+print(f"2D Rotation matrix (45°):\n{R_2d}")
+
+# Rotate a point
+point = np.array([1, 0])
+rotated = np.matmul(R_2d, point)
+print(f"Original point: {point}")
+print(f"Rotated point: {rotated}")
+```
+
+### 3D Rotations
+
+#### Rotation Around X-axis (Roll)
+
+```python
+theta = math.pi / 6  # 30 degrees
+
+R_x = np.array([
+    [1, 0, 0],
+    [0, math.cos(theta), -math.sin(theta)],
+    [0, math.sin(theta), math.cos(theta)]
+])
+
+print(f"Rotation around X-axis (30°):\n{R_x}")
+```
+
+#### Rotation Around Y-axis (Pitch)
+
+```python
+theta = math.pi / 6  # 30 degrees
+
+R_y = np.array([
+    [math.cos(theta), 0, math.sin(theta)],
+    [0, 1, 0],
+    [-math.sin(theta), 0, math.cos(theta)]
+])
+
+print(f"Rotation around Y-axis (30°):\n{R_y}")
+```
+
+#### Rotation Around Z-axis (Yaw)
+
+```python
+theta = math.pi / 6  # 30 degrees
+
+R_z = np.array([
+    [math.cos(theta), -math.sin(theta), 0],
+    [math.sin(theta), math.cos(theta), 0],
+    [0, 0, 1]
+])
+
+print(f"Rotation around Z-axis (30°):\n{R_z}")
+```
+
+#### Combined Rotations
+
+```python
+# Apply multiple rotations: first X, then Y, then Z
+R_combined = np.matmul(R_z, np.matmul(R_y, R_x))
+
+# Rotate a point
+point_3d = np.array([1, 0, 0])
+rotated_3d = np.matmul(R_combined, point_3d)
+print(f"Rotated 3D point: {rotated_3d}")
+```
+
+## Euler Angles
+
+### Representing 3D Orientations
+
+Euler angles (Roll, Pitch, Yaw) provide an intuitive way to describe rotations:
+
+```python
+import numpy as np
+import math
+
+# Euler angles in radians
+roll = math.pi / 6      # 30° rotation around X
+pitch = math.pi / 4     # 45° rotation around Y
+yaw = math.pi / 3       # 60° rotation around Z
+
+def euler_to_rotation_matrix(roll, pitch, yaw):
+    """Convert Euler angles to rotation matrix (ZYX convention)."""
+
+    # Sine and cosine of each angle
+    cr = math.cos(roll)
+    sr = math.sin(roll)
+    cp = math.cos(pitch)
+    sp = math.sin(pitch)
+    cy = math.cos(yaw)
+    sy = math.sin(yaw)
+
+    # Build rotation matrix
+    R = np.array([
+        [cy*cp, cy*sp*sr - sy*cr, cy*sp*cr + sy*sr],
+        [sy*cp, sy*sp*sr + cy*cr, sy*sp*cr - cy*sr],
+        [-sp, cp*sr, cp*cr]
+    ])
+
+    return R
+
+R_euler = euler_to_rotation_matrix(roll, pitch, yaw)
+print(f"Rotation matrix from Euler angles:\n{R_euler}")
+```
+
+## Quaternions
+
+### Understanding Quaternions
+
+Quaternions represent rotations as (x, y, z, w) where w is the scalar part:
+
+```python
+import numpy as np
+import math
+
+# Create quaternion from axis-angle representation
+# Rotate 90° around Z-axis
+angle = math.pi / 2
+axis = np.array([0, 0, 1])  # Z-axis
+
+# Quaternion formula: q = [sin(θ/2)*axis, cos(θ/2)]
+half_angle = angle / 2
+quat = np.concatenate([
+    math.sin(half_angle) * axis,
+    [math.cos(half_angle)]
+])
+print(f"Quaternion: {quat}")  # [0, 0, sin(45°), cos(45°)]
+
+# Quaternion normalization
+quat_norm = quat / np.linalg.norm(quat)
+print(f"Normalized quaternion: {quat_norm}")
+```
+
+### Quaternion Rotation
+
+```python
+def quaternion_to_rotation_matrix(q):
+    """Convert quaternion (x, y, z, w) to rotation matrix."""
+    x, y, z, w = q / np.linalg.norm(q)  # Normalize first
+
+    R = np.array([
+        [1 - 2*(y**2 + z**2), 2*(x*y - w*z), 2*(x*z + w*y)],
+        [2*(x*y + w*z), 1 - 2*(x**2 + z**2), 2*(y*z - w*x)],
+        [2*(x*z - w*y), 2*(y*z + w*x), 1 - 2*(x**2 + y**2)]
+    ])
+
+    return R
+
+q = np.array([0, 0, math.sin(math.pi/4), math.cos(math.pi/4)])
+R_from_quat = quaternion_to_rotation_matrix(q)
+print(f"Rotation matrix from quaternion:\n{R_from_quat}")
+
+# Rotate a point using quaternion
+def rotate_vector_by_quaternion(v, q):
+    """Rotate vector v by quaternion q."""
+    q = q / np.linalg.norm(q)
+    x, y, z, w = q
+
+    # Create quaternion from vector (imaginary part only)
+    v_quat = np.array([v[0], v[1], v[2], 0])
+
+    # Rotation: q * v * q^(-1)
+    q_conj = np.array([-x, -y, -z, w])
+
+    # Quaternion multiplication
+    def quat_mult(a, b):
+        return np.array([
+            a[3]*b[0] + a[0]*b[3] + a[1]*b[2] - a[2]*b[1],
+            a[3]*b[1] - a[0]*b[2] + a[1]*b[3] + a[2]*b[0],
+            a[3]*b[2] + a[0]*b[1] - a[1]*b[0] + a[2]*b[3],
+            a[3]*b[3] - a[0]*b[0] - a[1]*b[1] - a[2]*b[2]
+        ])
+
+    result = quat_mult(q, quat_mult(v_quat, q_conj))
+    return result[:3]
+
+v = np.array([1, 0, 0])
+v_rotated = rotate_vector_by_quaternion(v, q)
+print(f"Vector rotated by quaternion: {v_rotated}")
+```
+
+## Homogeneous Transformations
+
+### Transformation Matrices
+
+Combine rotation and translation in a single matrix:
+
+```python
+import numpy as np
+
+# Position (translation)
+position = np.array([1.0, 2.0, 3.0])
+
+# Rotation matrix (identity for simplicity)
+R = np.eye(3)
+
+# Create homogeneous transformation matrix
+T = np.eye(4)
+T[:3, :3] = R  # Rotation part
+T[:3, 3] = position  # Translation part
+
+print(f"Transformation matrix:\n{T}")
+
+# Transform a point
+point = np.array([1, 0, 0, 1])  # Note: homogeneous coordinate (1) at end
+transformed = np.matmul(T, point)
+print(f"Transformed point: {transformed[:3]}")
+
+# Compose transformations: T_total = T1 * T2
+T1 = np.array([
+    [1, 0, 0, 1],
+    [0, 1, 0, 2],
+    [0, 0, 1, 3],
+    [0, 0, 0, 1]
+])
+
+T2 = np.array([
+    [0, -1, 0, 0],
+    [1, 0, 0, 0],
+    [0, 0, 1, 0],
+    [0, 0, 0, 1]
+])
+
+T_combined = np.matmul(T1, T2)
+print(f"Combined transformation:\n{T_combined}")
+```
+
+## Trigonometric Relationships
+
+### Common Trigonometric Functions
+
+```python
+import numpy as np
+import math
+
+# Basic trigonometric functions
+theta = math.pi / 3  # 60 degrees
+
+sin_val = math.sin(theta)
+cos_val = math.cos(theta)
+tan_val = math.tan(theta)
+
+print(f"sin(60°) = {sin_val:.3f}")
+print(f"cos(60°) = {cos_val:.3f}")
+print(f"tan(60°) = {tan_val:.3f}")
+
+# Inverse trigonometric functions (output in radians)
+angle = math.asin(0.866)  # arcsin(√3/2) ≈ 60°
+print(f"arcsin(0.866) = {math.degrees(angle):.1f}°")
+
+angle = math.atan2(1, 1)  # atan2(y, x) for proper quadrant
+print(f"atan2(1, 1) = {math.degrees(angle):.1f}°")
+```
+
+### Law of Cosines
+
+Used for finding distances and angles in triangles:
+
+```python
+# Law of Cosines: c² = a² + b² - 2ab*cos(C)
+# Solving for angle C: cos(C) = (a² + b² - c²) / (2ab)
+
+import math
+
+a = 3  # Side 1
+b = 4  # Side 2
+c = 5  # Side 3 (opposite to angle C)
+
+# Find angle C
+cos_C = (a**2 + b**2 - c**2) / (2 * a * b)
+C_radians = math.acos(cos_C)
+C_degrees = math.degrees(C_radians)
+
+print(f"Angle C: {C_degrees:.1f}°")
+```
+
+### Law of Sines
+
+Used for solving triangles:
+
+```python
+# Law of Sines: a/sin(A) = b/sin(B) = c/sin(C)
+
+import math
+
+# Known: side a, angle A, angle B
+a = 10
+A_deg = 30
+B_deg = 45
+
+A_rad = math.radians(A_deg)
+B_rad = math.radians(B_deg)
+
+# Find side b
+b = a * math.sin(B_rad) / math.sin(A_rad)
+print(f"Side b: {b:.2f}")
+
+# Find angle C
+C_rad = math.pi - A_rad - B_rad
+c = a * math.sin(C_rad) / math.sin(A_rad)
+print(f"Angle C: {math.degrees(C_rad):.1f}°")
+print(f"Side c: {c:.2f}")
+```
+
+## Practical Example: Robot Arm Orientation
+
+```python
+import numpy as np
+import math
+
+class RobotArmOrientation:
+    """Calculate and manage robot arm orientation."""
+
+    def __init__(self, roll, pitch, yaw):
+        """Initialize with Euler angles in degrees."""
+        self.roll = math.radians(roll)
+        self.pitch = math.radians(pitch)
+        self.yaw = math.radians(yaw)
+
+    def to_rotation_matrix(self):
+        """Convert to rotation matrix."""
+        cr = math.cos(self.roll)
+        sr = math.sin(self.roll)
+        cp = math.cos(self.pitch)
+        sp = math.sin(self.pitch)
+        cy = math.cos(self.yaw)
+        sy = math.sin(self.yaw)
+
+        return np.array([
+            [cy*cp, cy*sp*sr - sy*cr, cy*sp*cr + sy*sr],
+            [sy*cp, sy*sp*sr + cy*cr, sy*sp*cr - cy*sr],
+            [-sp, cp*sr, cp*cr]
+        ])
+
+    def to_quaternion(self):
+        """Convert to quaternion."""
+        cy = math.cos(self.yaw * 0.5)
+        sy = math.sin(self.yaw * 0.5)
+        cp = math.cos(self.pitch * 0.5)
+        sp = math.sin(self.pitch * 0.5)
+        cr = math.cos(self.roll * 0.5)
+        sr = math.sin(self.roll * 0.5)
+
+        qx = sr * cp * cy - cr * sp * sy
+        qy = cr * sp * cy + sr * cp * sy
+        qz = cr * cp * sy - sr * sp * cy
+        qw = cr * cp * cy + sr * sp * sy
+
+        return np.array([qx, qy, qz, qw])
+
+    def rotate_point(self, point):
+        """Rotate a point using the stored orientation."""
+        R = self.to_rotation_matrix()
+        return np.matmul(R, point)
+
+# Create arm orientation: 30° roll, 45° pitch, 60° yaw
+arm = RobotArmOrientation(30, 45, 60)
+
+print("Rotation matrix:")
+print(arm.to_rotation_matrix())
+
+print("\nQuaternion:")
+print(arm.to_quaternion())
+
+point = np.array([1, 0, 0])
+rotated = arm.rotate_point(point)
+print(f"\nPoint (1,0,0) rotated: {rotated}")
+```
+
+## Summary Table
+
+| Concept | Formula | Use Case |
+|---------|---------|----------|
+| Dot product | a·b = \|a\|\|b\|cos(θ) | Angle between vectors |
+| Cross product | a×b = \|a\|\|b\|sin(θ)n | Perpendicular direction |
+| Rotation matrix | R(θ) | Rotate points or frames |
+| Euler angles | (roll, pitch, yaw) | Intuitive orientation |
+| Quaternion | (x, y, z, w) | Smooth rotations, no gimbal lock |
+| Homogeneous transform | T = [R \| t; 0 \| 1] | Combine rotation + translation |
+
+## Next Steps
+
+Now that you understand the mathematics, the next chapter will focus on development tools and creating your robot development environment. You'll apply these mathematical concepts in practical code.

@@ -1,0 +1,598 @@
+---
+id: chapter-4-tools-setup
+title: "Chapter 4: Development Tools & Environment Setup"
+description: "Set up your robot development environment with essential tools, IDEs, version control, and packages for robotics development."
+sidebar_position: 4
+module: 1
+part: 2
+chapter_index: 4
+learning_objectives:
+  - Install and configure Python development tools
+  - Set up Git for version control
+  - Create and manage virtual environments
+  - Install robotics libraries and dependencies
+  - Configure IDE for Python development
+  - Understand package management
+prerequisites: []
+keywords:
+  - Virtual environment
+  - Package management
+  - Git
+  - IDE
+  - Development setup
+  - Dependencies
+---
+
+# Chapter 4: Development Tools & Environment Setup
+
+## Introduction
+
+Professional robotics development requires a properly configured environment with the right tools. This chapter guides you through setting up your development workspace for robot programming.
+
+## Installing Python
+
+### Download Python
+
+1. Visit [python.org](https://www.python.org/downloads/)
+2. Download Python 3.12 or later
+3. **Important**: Check "Add Python to PATH" during installation
+
+### Verify Installation
+
+```bash
+# Check Python version
+python --version
+# Output: Python 3.12.0
+
+# Check pip (package manager)
+pip --version
+# Output: pip 23.3.1 from ...
+
+# Check Python location
+python -c "import sys; print(sys.executable)"
+```
+
+## Virtual Environments
+
+### Why Virtual Environments?
+
+Virtual environments isolate project dependencies:
+- Different projects can use different package versions
+- Avoids conflicts between global packages
+- Easy to reproduce development setup
+
+### Creating a Virtual Environment
+
+```bash
+# Navigate to your project directory
+cd my_robotics_project
+
+# Create virtual environment (Linux/Mac)
+python3 -m venv venv
+
+# Create virtual environment (Windows)
+python -m venv venv
+```
+
+### Activating the Virtual Environment
+
+**Linux/Mac:**
+```bash
+source venv/bin/activate
+# Prompt changes to: (venv) user@machine:~$
+```
+
+**Windows Command Prompt:**
+```bash
+venv\Scripts\activate
+# Prompt changes to: (venv) C:\path\to\project>
+```
+
+**Windows PowerShell:**
+```powershell
+venv\Scripts\Activate.ps1
+```
+
+### Installing Packages
+
+Once activated, install packages locally:
+
+```bash
+# Install single package
+pip install pybullet
+
+# Install multiple packages
+pip install numpy scipy matplotlib
+
+# Install specific version
+pip install tensorflow==2.13.0
+
+# List installed packages
+pip list
+
+# Freeze requirements to file
+pip freeze > requirements.txt
+```
+
+### Using Requirements Files
+
+Create `requirements.txt` for your project:
+
+```
+numpy==1.24.3
+scipy==1.11.2
+matplotlib==3.7.2
+pybullet==3.2.6
+opencv-python==4.8.0
+PyQt5==5.15.9
+```
+
+Install all dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+## Essential Robotics Libraries
+
+### NumPy
+
+Scientific computing with arrays:
+
+```bash
+pip install numpy
+```
+
+```python
+import numpy as np
+
+# Create arrays
+arr = np.array([1, 2, 3, 4, 5])
+matrix = np.array([[1, 2], [3, 4]])
+
+# Linear algebra
+v1 = np.array([1, 0, 0])
+v2 = np.array([0, 1, 0])
+cross = np.cross(v1, v2)
+```
+
+### SciPy
+
+Scientific algorithms:
+
+```bash
+pip install scipy
+```
+
+```python
+from scipy import optimize
+from scipy.spatial.transform import Rotation
+
+# Rotation handling
+r = Rotation.from_euler('xyz', [90, 45, 30], degrees=True)
+rotation_matrix = r.as_matrix()
+quaternion = r.as_quat()
+```
+
+### Matplotlib
+
+Data visualization:
+
+```bash
+pip install matplotlib
+```
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Plot joint angles over time
+time = np.linspace(0, 10, 100)
+angle = np.sin(time)
+
+plt.plot(time, angle)
+plt.xlabel('Time (s)')
+plt.ylabel('Angle (rad)')
+plt.show()
+```
+
+### PyBullet
+
+Physics simulation:
+
+```bash
+pip install pybullet
+```
+
+```python
+import pybullet as p
+import pybullet_data
+
+client = p.connect(p.GUI)
+p.setAdditionalSearchPath(pybullet_data.getDataPath())
+robot = p.loadURDF("r2d2.urdf")
+```
+
+### ROS2 (Robot Operating System)
+
+For more complex robotics projects:
+
+```bash
+# Installation varies by OS - see ros.org for instructions
+# Ubuntu 20.04 example:
+sudo apt update
+sudo apt install ros-foxy-desktop
+
+# Source setup script
+source /opt/ros/foxy/setup.bash
+```
+
+## Version Control with Git
+
+### Installing Git
+
+Download from [git-scm.com](https://git-scm.com/)
+
+Verify installation:
+```bash
+git --version
+# Output: git version 2.40.0
+```
+
+### Initial Git Setup
+
+```bash
+# Configure user information
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+
+# List configuration
+git config --global --list
+```
+
+### Basic Git Workflow
+
+```bash
+# Initialize repository
+cd my_robotics_project
+git init
+
+# Check status
+git status
+
+# Add files to staging
+git add .
+git add specific_file.py
+
+# Commit changes
+git commit -m "Initial commit: set up project structure"
+
+# View commit history
+git log
+
+# Show what changed
+git diff
+```
+
+### Working with Remote Repositories
+
+```bash
+# Clone a repository
+git clone https://github.com/username/robot-repo.git
+
+# Add remote repository
+git remote add origin https://github.com/username/robot-repo.git
+
+# Push commits to remote
+git push origin main
+
+# Pull latest changes
+git pull origin main
+
+# Create new branch
+git checkout -b feature/new-controller
+
+# Switch branches
+git checkout main
+
+# Merge branch
+git merge feature/new-controller
+```
+
+### .gitignore File
+
+Create `.gitignore` to exclude files:
+
+```
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Simulation/Data
+*.log
+simulation_output/
+data/
+```
+
+## IDE Setup
+
+### PyCharm Community Edition
+
+1. Download from [jetbrains.com](https://www.jetbrains.com/pycharm/)
+2. Install and open
+3. Configure Python interpreter:
+   - File → Settings → Project → Python Interpreter
+   - Select virtual environment
+
+### Visual Studio Code
+
+1. Install from [code.visualstudio.com](https://code.visualstudio.com/)
+2. Install Python extension (Microsoft)
+3. Create `.vscode/settings.json`:
+
+```json
+{
+    "python.defaultInterpreterPath": "${workspaceFolder}/venv/bin/python",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": true,
+    "python.formatting.provider": "black",
+    "editor.formatOnSave": true
+}
+```
+
+### Creating a Launch Configuration
+
+Create `.vscode/launch.json` for debugging:
+
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: Simulation",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/simulation.py",
+            "console": "integratedTerminal"
+        }
+    ]
+}
+```
+
+## Project Structure
+
+Create an organized project layout:
+
+```
+my_robotics_project/
+├── venv/                    # Virtual environment
+├── src/
+│   ├── __init__.py
+│   ├── robot.py            # Main robot class
+│   ├── controller.py        # Control logic
+│   └── utils.py            # Helper functions
+├── tests/
+│   ├── test_robot.py
+│   └── test_controller.py
+├── models/
+│   ├── robot.urdf          # URDF file
+│   └── objects/
+├── data/
+│   └── trajectories/
+├── docs/
+│   └── README.md
+├── requirements.txt
+├── .gitignore
+└── README.md
+```
+
+## Writing Your First Script
+
+Create `src/simple_robot.py`:
+
+```python
+#!/usr/bin/env python3
+"""
+Simple robot controller example.
+Demonstrates basic robot control structure.
+"""
+
+import numpy as np
+import pybullet as p
+import pybullet_data
+import time
+
+
+class SimpleRobot:
+    """A simple robot controller."""
+
+    def __init__(self, robot_urdf="r2d2.urdf"):
+        """Initialize robot in simulation."""
+        # Connect to physics engine
+        self.client = p.connect(p.GUI)
+        p.setGravity(0, 0, -9.81)
+        p.setAdditionalSearchPath(pybullet_data.getDataPath())
+
+        # Load objects
+        self.plane = p.loadURDF("plane.urdf")
+        self.robot_id = p.loadURDF(robot_urdf, [0, 0, 1])
+        self.num_joints = p.getNumJoints(self.robot_id)
+
+    def get_joint_angles(self):
+        """Get all joint angles."""
+        angles = []
+        for i in range(self.num_joints):
+            state = p.getJointState(self.robot_id, i)
+            angles.append(state[0])
+        return np.array(angles)
+
+    def set_joint_targets(self, targets):
+        """Set target angles for joints."""
+        for i, target in enumerate(targets):
+            if i < self.num_joints:
+                p.setJointMotorControl2(
+                    self.robot_id,
+                    i,
+                    p.POSITION_CONTROL,
+                    targetPosition=target,
+                    force=100
+                )
+
+    def step(self):
+        """Step simulation."""
+        p.stepSimulation()
+
+    def close(self):
+        """Close simulation."""
+        p.disconnect()
+
+
+if __name__ == "__main__":
+    # Create robot
+    robot = SimpleRobot()
+
+    # Simulate
+    for step in range(1000):
+        # Get current angles
+        angles = robot.get_joint_angles()
+
+        # Set target (simple sine wave movement)
+        targets = np.sin(step / 100) * 0.5
+        if robot.num_joints > 0:
+            robot.set_joint_targets([targets] * robot.num_joints)
+
+        robot.step()
+        time.sleep(1.0 / 240.0)
+
+        if step % 100 == 0:
+            print(f"Step {step}: Angles = {angles[:3]}")
+
+    robot.close()
+```
+
+Run your script:
+
+```bash
+python src/simple_robot.py
+```
+
+## Testing Your Setup
+
+Create `tests/test_setup.py`:
+
+```python
+"""Test that all dependencies are installed correctly."""
+
+import sys
+
+
+def test_imports():
+    """Test that key packages can be imported."""
+    try:
+        import numpy
+        print("✓ NumPy installed")
+    except ImportError:
+        print("✗ NumPy NOT installed")
+        return False
+
+    try:
+        import scipy
+        print("✓ SciPy installed")
+    except ImportError:
+        print("✗ SciPy NOT installed")
+
+    try:
+        import pybullet
+        print("✓ PyBullet installed")
+    except ImportError:
+        print("✗ PyBullet NOT installed")
+        return False
+
+    try:
+        import matplotlib
+        print("✓ Matplotlib installed")
+    except ImportError:
+        print("✗ Matplotlib NOT installed")
+
+    print(f"\nPython version: {sys.version}")
+    return True
+
+
+if __name__ == "__main__":
+    success = test_imports()
+    sys.exit(0 if success else 1)
+```
+
+Run tests:
+
+```bash
+python tests/test_setup.py
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**PyBullet GUI not opening (Linux)**
+```bash
+# Install missing display libraries
+sudo apt-get install libgl1-mesa-glx libxkbcommon-x11-0
+
+# Run with DISPLAY set
+DISPLAY=:0 python script.py
+```
+
+**Permission Denied on Linux**
+```bash
+# Make script executable
+chmod +x script.py
+
+# Run directly
+./script.py
+```
+
+**Module Not Found**
+```bash
+# Make sure virtual environment is activated
+source venv/bin/activate
+
+# Reinstall package
+pip install --force-reinstall package_name
+```
+
+## Summary Table
+
+| Tool | Purpose | Command |
+|------|---------|---------|
+| Python | Language | `python --version` |
+| pip | Package manager | `pip install package` |
+| venv | Virtual environment | `python -m venv venv` |
+| Git | Version control | `git clone repo` |
+| PyCharm | IDE | Download from JetBrains |
+| VS Code | IDE | Download from Microsoft |
+
+## Next Steps
+
+You now have a complete development environment! The next section (Module 2) will cover the hardware components of robots: sensors that perceive the world and actuators that move the robot.
