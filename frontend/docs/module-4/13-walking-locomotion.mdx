@@ -1,0 +1,337 @@
+---
+id: chapter-13-walking-locomotion
+title: "Chapter 13: Walking & Locomotion Algorithms"
+description: "Implement walking gaits and locomotion algorithms for bipedal and quadrupedal humanoid robots."
+sidebar_position: 13
+module: 4
+part: 1
+chapter_index: 13
+learning_objectives:
+  - Understand bipedal walking dynamics and stability
+  - Implement ZMP (Zero Moment Point) control
+  - Create gait patterns and transitions
+  - Balance and fall recovery
+  - Optimize for energy efficiency
+prerequisites: [6, 8, 11]
+keywords:
+  - Walking gait
+  - ZMP
+  - Bipedal locomotion
+  - Balance
+  - CPG
+  - Trajectory
+---
+
+# Chapter 13: Walking & Locomotion Algorithms
+
+## Bipedal Walking Fundamentals
+
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+
+class BipedalWalker:
+    """Simplified bipedal walking model."""
+
+    def __init__(self):
+        self.leg_length = 0.5
+        self.body_height = 1.0
+        self.step_length = 0.3
+        self.step_height = 0.1
+
+    def calculate_leg_angles(self, phase, leg='left'):
+        """
+        Calculate hip and knee angles for a leg during gait.
+        phase: 0-1, where 0 is start of swing, 1 is end
+        """
+        if leg == 'left':
+            swing_phase = phase
+            stance_phase = (phase + 0.5) % 1.0
+        else:
+            swing_phase = (phase + 0.5) % 1.0
+            stance_phase = phase
+
+        # Swing leg: move forward and up
+        if swing_phase < 0.5:
+            # Lift phase
+            t = swing_phase * 2  # 0 to 1
+            hip_angle = -0.3 + 0.6 * t  # Swing forward
+            knee_angle = 0.5 * np.sin(np.pi * t)  # Lift knee
+        else:
+            # Lower phase
+            t = (swing_phase - 0.5) * 2  # 0 to 1
+            hip_angle = 0.3 - 0.3 * t
+            knee_angle = 0.5 * np.sin(np.pi * (1 - t))
+
+        # Stance leg: support body
+        ankle_angle = -0.1 * np.sin(2 * np.pi * stance_phase)
+
+        return hip_angle, knee_angle, ankle_angle
+
+    def get_foot_position(self, hip_angle, knee_angle, ankle_angle):
+        """Get foot position from joint angles."""
+        # Forward kinematics
+        hip_pos = np.array([0, -self.body_height])
+
+        # Thigh
+        thigh_end = hip_pos + self.leg_length * np.array([
+            np.sin(hip_angle),
+            -np.cos(hip_angle)
+        ])
+
+        # Shin
+        knee_angle_global = hip_angle + knee_angle
+        shin_end = thigh_end + self.leg_length * np.array([
+            np.sin(knee_angle_global),
+            -np.cos(knee_angle_global)
+        ])
+
+        return shin_end
+
+    def generate_gait(self, num_steps=4, steps_per_cycle=100):
+        """Generate walking trajectory."""
+        left_positions = []
+        right_positions = []
+
+        for step in range(num_steps * steps_per_cycle):
+            phase = (step % steps_per_cycle) / steps_per_cycle
+
+            hip_l, knee_l, ankle_l = self.calculate_leg_angles(phase, 'left')
+            hip_r, knee_r, ankle_r = self.calculate_leg_angles(phase, 'right')
+
+            left_pos = self.get_foot_position(hip_l, knee_l, ankle_l)
+            right_pos = self.get_foot_position(hip_r, knee_r, ankle_r)
+
+            left_positions.append(left_pos)
+            right_positions.append(right_pos)
+
+        return np.array(left_positions), np.array(right_positions)
+
+# Generate and visualize gait
+walker = BipedalWalker()
+left_pos, right_pos = walker.generate_gait(num_steps=2)
+
+plt.figure(figsize=(12, 4))
+plt.plot(left_pos[:, 0], left_pos[:, 1], 'b-', label='Left foot')
+plt.plot(right_pos[:, 0], right_pos[:, 1], 'r-', label='Right foot')
+plt.xlabel('Forward distance (m)')
+plt.ylabel('Height (m)')
+plt.legend()
+plt.title('Bipedal Walking Trajectory')
+plt.show()
+```
+
+## Zero Moment Point (ZMP) Control
+
+```python
+class ZMPController:
+    """Control stability using Zero Moment Point."""
+
+    def __init__(self, mass=50, g=9.81):
+        self.mass = mass
+        self.g = g
+
+    def calculate_zmp(self, com_position, com_acceleration, support_base_x):
+        """
+        Calculate ZMP from COM position and acceleration.
+        ZMP must remain within support base for stability.
+        """
+        # ZMP formula
+        z_com = com_position[2]
+        z_zmp = z_com - (com_acceleration[0] / self.g)
+
+        zmp_x = com_position[0] - (com_acceleration[2] / self.g) * z_com
+
+        return zmp_x, z_zmp
+
+    def check_stability(self, zmp_x, base_left, base_right):
+        """Check if ZMP is within support base."""
+        if base_left < zmp_x < base_right:
+            return True, 0  # Stable, no correction needed
+        else:
+            # Calculate correction
+            center = (base_left + base_right) / 2
+            correction = center - zmp_x
+            return False, correction
+
+    def generate_stable_trajectory(self, step_duration=1.0, steps=10):
+        """Generate trajectory that maintains stability."""
+        trajectory = []
+        dt = 0.01
+        t_step = 0
+
+        for step in range(steps):
+            for _ in range(int(step_duration / dt)):
+                # Simplified pendulum motion for COM
+                phase = t_step / step_duration
+
+                # Swing phase (moving leg)
+                if phase < 0.5:
+                    com_x = phase * 0.1  # Move forward
+                    com_z = 0.8 - 0.05 * np.cos(2 * np.pi * phase)
+                    com_accel_x = 0.1 / step_duration
+                else:
+                    com_x = 0.05 + (phase - 0.5) * 0.1
+                    com_z = 0.8 - 0.05 * np.cos(2 * np.pi * phase)
+                    com_accel_x = 0.1 / step_duration
+
+                zmp_x, zmp_z = self.calculate_zmp(
+                    np.array([com_x, 0, com_z]),
+                    np.array([com_accel_x, 0, 0]),
+                    support_z=0
+                )
+
+                trajectory.append({
+                    'com': [com_x, 0, com_z],
+                    'zmp': zmp_x,
+                    'time': t_step
+                })
+
+                t_step += dt
+
+        return trajectory
+```
+
+## Gait Pattern Generation
+
+```python
+class GaitGenerator:
+    """Generate different gait patterns."""
+
+    @staticmethod
+    def walk_gait(stance_duration=0.6, swing_duration=0.4, stride_length=0.3):
+        """Normal walking gait."""
+        gait_cycle = stance_duration + swing_duration
+        phases = {
+            'double_support_1': (0, 0.1 * gait_cycle),
+            'single_support_r': (0.1 * gait_cycle, 0.6 * gait_cycle),
+            'double_support_2': (0.6 * gait_cycle, 0.7 * gait_cycle),
+            'single_support_l': (0.7 * gait_cycle, gait_cycle)
+        }
+        return phases, stride_length
+
+    @staticmethod
+    def run_gait(stride_length=0.5, step_frequency=2.0):
+        """Running gait (flight phase)."""
+        gait_cycle = 1.0 / step_frequency
+        phases = {
+            'flight': (0, 0.3 * gait_cycle),
+            'contact_l': (0.3 * gait_cycle, 0.5 * gait_cycle),
+            'flight_2': (0.5 * gait_cycle, 0.8 * gait_cycle),
+            'contact_r': (0.8 * gait_cycle, gait_cycle)
+        }
+        return phases, stride_length
+
+    @staticmethod
+    def climb_gait(step_height=0.2, stride_length=0.2):
+        """Stair climbing gait."""
+        gait_cycle = 2.0  # Slower
+        phases = {
+            'lift_l': (0, 0.3 * gait_cycle),
+            'place_l': (0.3 * gait_cycle, 0.5 * gait_cycle),
+            'lift_r': (0.5 * gait_cycle, 0.8 * gait_cycle),
+            'place_r': (0.8 * gait_cycle, gait_cycle)
+        }
+        return phases, stride_length
+
+class GaitController:
+    """Control robot walking with smooth transitions."""
+
+    def __init__(self):
+        self.current_gait = 'walk'
+        self.target_gait = 'walk'
+        self.gait_blend = 0.0
+
+    def set_target_gait(self, target):
+        self.target_gait = target
+
+    def update_gait(self, dt=0.01):
+        """Smoothly blend between gaits."""
+        blend_speed = 0.1
+
+        if self.target_gait != self.current_gait:
+            self.gait_blend += blend_speed * dt
+
+            if self.gait_blend >= 1.0:
+                self.current_gait = self.target_gait
+                self.gait_blend = 0.0
+
+    def get_joint_targets(self, phase):
+        """Get joint angle targets based on current gait."""
+        if self.current_gait == 'walk':
+            hip_l, knee_l, ankle_l = self._walk_phase(phase, 'left')
+        elif self.current_gait == 'run':
+            hip_l, knee_l, ankle_l = self._run_phase(phase, 'left')
+        else:
+            hip_l, knee_l, ankle_l = 0, 0, 0
+
+        return hip_l, knee_l, ankle_l
+
+    def _walk_phase(self, phase, leg):
+        """Walking phase calculation."""
+        if phase < 0.5:
+            t = phase * 2
+            angle = 0.3 * np.sin(np.pi * t)
+        else:
+            t = (phase - 0.5) * 2
+            angle = -0.3 * np.sin(np.pi * t)
+
+        return angle, 0.1 * np.sin(np.pi * phase), 0
+```
+
+## Balance Recovery
+
+```python
+class BalanceController:
+    """Recover balance when ZMP leaves support base."""
+
+    def __init__(self):
+        self.max_tilt = 0.5  # Max body tilt in radians
+        self.recovery_time = 0.5
+
+    def calculate_recovery_action(self, zmp_error, support_base_width):
+        """Calculate joint adjustments to recover balance."""
+        # P controller
+        kp = 10.0
+        correction = kp * zmp_error
+
+        # Limit correction
+        correction = np.clip(correction, -self.max_tilt, self.max_tilt)
+
+        return correction
+
+    def detect_falling(self, com_height, com_velocity_z, floor_height=0):
+        """Detect if robot is falling."""
+        falling_velocity_threshold = -0.5  # m/s
+
+        if com_height < floor_height + 0.3:
+            return True
+
+        if com_velocity_z < falling_velocity_threshold:
+            return True
+
+        return False
+
+    def execute_fall_recovery(self):
+        """Execute fall recovery maneuver."""
+        recovery_steps = [
+            {'action': 'bend_knees', 'duration': 0.2},
+            {'action': 'extend_arms', 'duration': 0.1},
+            {'action': 'roll', 'duration': 0.3},
+            {'action': 'push_up', 'duration': 0.5}
+        ]
+        return recovery_steps
+```
+
+## Summary
+
+| Algorithm | Purpose |
+|-----------|---------|
+| ZMP | Stability check |
+| Gait Pattern | Walking style |
+| Trajectory | Joint targets |
+| Balance | Perturbation recovery |
+
+## Next Steps
+
+The next chapter covers grasping and manipulation algorithms for humanoid hands.

@@ -1,0 +1,389 @@
+---
+id: chapter-14-grasping-manipulation
+title: "Chapter 14: Grasping & Manipulation"
+description: "Implement grasping and object manipulation algorithms for humanoid robot hands."
+sidebar_position: 14
+module: 4
+part: 1
+chapter_index: 14
+learning_objectives:
+  - Understand grasp planning and stability
+  - Implement grasp quality metrics
+  - Plan pick-and-place operations
+  - Control multi-finger grasping
+  - Handle object slipping and force feedback
+prerequisites: [6, 8, 13]
+keywords:
+  - Grasping
+  - Force closure
+  - Grasp quality
+  - Manipulation
+  - Pick and place
+---
+
+# Chapter 14: Grasping & Manipulation
+
+## Grasp Analysis
+
+```python
+import numpy as np
+from scipy.spatial import distance
+
+class GraspAnalyzer:
+    """Analyze grasp quality and stability."""
+
+    def __init__(self, object_pos, finger_radius=0.01):
+        self.object_pos = object_pos
+        self.finger_radius = finger_radius
+
+    def calculate_contact_points(self, finger_positions):
+        """Calculate contact points between fingers and object."""
+        contacts = []
+        for finger_pos in finger_positions:
+            direction = (self.object_pos - finger_pos) / np.linalg.norm(self.object_pos - finger_pos)
+            contact_point = self.object_pos - direction * self.finger_radius
+            contacts.append(contact_point)
+
+        return np.array(contacts)
+
+    def force_closure_check(self, contact_points, normals, num_friction_cones=4):
+        """Check if grasp achieves force closure."""
+        # Force closure requires 4+ contact points with good geometry
+        if len(contact_points) < 4:
+            return False, 0
+
+        # Build grasp matrix
+        G = []
+        for i, (point, normal) in enumerate(zip(contact_points, normals)):
+            # Wrench from point contact
+            moment_arm = np.cross(point - self.object_pos, normal)
+            G.append(np.concatenate([normal, moment_arm]))
+
+        G = np.array(G).T
+
+        # Check rank
+        rank = np.linalg.matrix_rank(G)
+        is_force_closure = rank >= 6
+
+        # Grasp quality metric
+        if is_force_closure:
+            singular_values = np.linalg.svd(G)[1]
+            quality = np.min(singular_values)
+        else:
+            quality = 0
+
+        return is_force_closure, quality
+
+    def grasp_isotropy(self, contact_points, normals):
+        """Measure isotropy (uniform force distribution capability)."""
+        G = []
+        for point, normal in zip(contact_points, normals):
+            moment_arm = np.cross(point - self.object_pos, normal)
+            G.append(np.concatenate([normal, moment_arm]))
+
+        G = np.array(G).T
+
+        # Eigenvalues of GG^T
+        A = G @ G.T
+        eigenvalues = np.linalg.eigvalsh(A)
+
+        # Condition number
+        isotropy = np.min(eigenvalues) / np.max(eigenvalues)
+        return isotropy
+```
+
+## Grasp Planning
+
+```python
+class GraspPlanner:
+    """Plan grasps for object manipulation."""
+
+    def __init__(self, object_mesh, num_candidates=100):
+        self.object_mesh = object_mesh
+        self.num_candidates = num_candidates
+
+    def generate_grasp_candidates(self):
+        """Generate candidate grasp configurations."""
+        grasps = []
+
+        for _ in range(self.num_candidates):
+            # Random object surface point
+            u, v = np.random.random(2)
+            surface_point = self._sample_surface_point(u, v)
+
+            # Surface normal
+            normal = self._compute_normal(u, v)
+
+            # Grasp approach direction (opposite to normal)
+            approach = -normal
+
+            grasp = {
+                'position': surface_point,
+                'normal': normal,
+                'approach': approach,
+                'quality': 0
+            }
+
+            grasps.append(grasp)
+
+        return grasps
+
+    def evaluate_grasps(self, grasps):
+        """Rank grasps by quality metric."""
+        scored_grasps = []
+
+        for grasp in grasps:
+            # Simulate grasp
+            quality = self._simulate_grasp(grasp)
+
+            grasp['quality'] = quality
+            scored_grasps.append(grasp)
+
+        # Sort by quality
+        scored_grasps.sort(key=lambda g: g['quality'], reverse=True)
+
+        return scored_grasps
+
+    def _sample_surface_point(self, u, v):
+        """Sample point on object surface."""
+        return np.array([u, v, np.sqrt(u**2 + v**2)])
+
+    def _compute_normal(self, u, v):
+        """Compute surface normal."""
+        return np.array([u, v, -(u**2 + v**2)]) / np.linalg.norm(np.array([u, v, -(u**2 + v**2)]))
+
+    def _simulate_grasp(self, grasp):
+        """Simulate grasp and return quality."""
+        return np.random.random()
+```
+
+## Finger Control
+
+```python
+class MultiFingerGrasper:
+    """Control multi-finger grasp."""
+
+    def __init__(self, num_fingers=5):
+        self.num_fingers = num_fingers
+        self.finger_forces = np.zeros(num_fingers)
+        self.finger_positions = np.zeros((num_fingers, 3))
+
+    def compute_force_distribution(self, desired_wrench, contact_normals):
+        """
+        Distribute desired wrench across fingers.
+        desired_wrench: [fx, fy, fz, mx, my, mz]
+        """
+        # Build grasp matrix
+        G = []
+        for normal in contact_normals:
+            moment_arm = np.cross(self.finger_positions[len(G)] - np.array([0, 0, 0]), normal)
+            G.append(np.concatenate([normal, moment_arm]))
+
+        G = np.array(G).T
+
+        # Least-squares solution
+        try:
+            finger_forces = np.linalg.lstsq(G, desired_wrench)[0]
+            finger_forces = np.maximum(finger_forces, 0)  # No pulling
+        except:
+            finger_forces = np.zeros(len(contact_normals))
+
+        return finger_forces
+
+    def detect_slip(self, contact_forces, friction_coefficients):
+        """Detect if any finger is slipping."""
+        for i, (force, mu) in enumerate(zip(contact_forces, friction_coefficients)):
+            normal_force = force[2]  # Normal component
+            tangential_force = np.linalg.norm(force[:2])
+
+            if tangential_force > mu * normal_force:
+                return True, i  # Slipping, finger i
+
+        return False, -1
+
+    def adjust_grasp_on_slip(self, slip_detected, finger_id):
+        """Increase grip when slip detected."""
+        if slip_detected:
+            # Increase forces on all fingers
+            self.finger_forces *= 1.2
+
+            # Increase more on slipping finger
+            self.finger_forces[finger_id] *= 1.5
+
+            return True
+
+        return False
+```
+
+## Pick-and-Place Operations
+
+```python
+class PickAndPlaceController:
+    """Execute pick-and-place operations."""
+
+    def __init__(self, robot_arm, gripper):
+        self.arm = robot_arm
+        self.gripper = gripper
+        self.target_object_pos = None
+
+    def execute_pick(self, object_pos, place_pos):
+        """Execute complete pick operation."""
+        steps = []
+
+        # Approach
+        approach_pos = object_pos + np.array([0, 0, 0.2])
+        steps.append({
+            'action': 'move_to',
+            'target': approach_pos,
+            'duration': 1.0
+        })
+
+        # Descend
+        steps.append({
+            'action': 'move_to',
+            'target': object_pos,
+            'duration': 1.0
+        })
+
+        # Close gripper
+        steps.append({
+            'action': 'close_gripper',
+            'force': 50,  # Newtons
+            'duration': 0.5
+        })
+
+        # Lift
+        lift_pos = object_pos + np.array([0, 0, 0.3])
+        steps.append({
+            'action': 'move_to',
+            'target': lift_pos,
+            'duration': 1.0
+        })
+
+        # Move to place location
+        approach_place = place_pos + np.array([0, 0, 0.2])
+        steps.append({
+            'action': 'move_to',
+            'target': approach_place,
+            'duration': 1.0
+        })
+
+        # Lower
+        steps.append({
+            'action': 'move_to',
+            'target': place_pos,
+            'duration': 1.0
+        })
+
+        # Open gripper
+        steps.append({
+            'action': 'open_gripper',
+            'duration': 0.5
+        })
+
+        # Retract
+        retract = place_pos + np.array([0, 0, 0.2])
+        steps.append({
+            'action': 'move_to',
+            'target': retract,
+            'duration': 1.0
+        })
+
+        return steps
+
+    def execute_operation(self, steps):
+        """Execute sequence of manipulation steps."""
+        for step in steps:
+            if step['action'] == 'move_to':
+                self.arm.move_to(step['target'], duration=step['duration'])
+
+            elif step['action'] == 'close_gripper':
+                self.gripper.close(force=step.get('force', 50))
+
+            elif step['action'] == 'open_gripper':
+                self.gripper.open()
+
+            print(f"Executed: {step['action']}")
+```
+
+## In-Hand Manipulation
+
+```python
+class InHandManipulator:
+    """Manipulate object within hand."""
+
+    def __init__(self, num_fingers=5):
+        self.num_fingers = num_fingers
+        self.object_pose = np.eye(4)
+
+    def rolling(self, duration=1.0, direction='forward'):
+        """Roll object across fingers."""
+        trajectory = []
+
+        for t in np.linspace(0, duration, 100):
+            phase = t / duration
+
+            if direction == 'forward':
+                # Fingers close sequentially from thumb to pinky
+                finger_closures = phase * self.num_fingers
+            else:
+                finger_closures = (1 - phase) * self.num_fingers
+
+            trajectory.append(finger_closures)
+
+        return trajectory
+
+    def spinning(self, axis, angular_velocity, duration):
+        """Spin object around axis."""
+        total_angle = angular_velocity * duration
+
+        rotations = []
+        for t in np.linspace(0, duration, 100):
+            angle = angular_velocity * t
+
+            # Rotation matrix around axis
+            cos_a = np.cos(angle)
+            sin_a = np.sin(angle)
+
+            K = np.array([
+                [0, -axis[2], axis[1]],
+                [axis[2], 0, -axis[0]],
+                [-axis[1], axis[0], 0]
+            ])
+
+            R = np.eye(3) + sin_a * K + (1 - cos_a) * (K @ K)
+            rotations.append(R)
+
+        return rotations
+
+    def pivoting(self, pivot_point, target_orientation):
+        """Pivot object around pivot point."""
+        steps = []
+
+        # Move object while maintaining contact at pivot
+        current_angle = 0
+        target_angle = np.pi / 2
+
+        for step in range(10):
+            angle = (step / 9) * target_angle
+            steps.append({
+                'pivot': pivot_point,
+                'angle': angle
+            })
+
+        return steps
+```
+
+## Summary
+
+| Operation | Purpose |
+|-----------|---------|
+| Grasp Analysis | Stability check |
+| Grasp Planning | Find best grasp |
+| Force Distribution | Maintain grip |
+| Slip Detection | Prevent dropping |
+| Pick-and-Place | Complete operation |
+
+## Next Steps
+
+The next chapter covers decision-making and agentic behaviors for autonomous humanoids.

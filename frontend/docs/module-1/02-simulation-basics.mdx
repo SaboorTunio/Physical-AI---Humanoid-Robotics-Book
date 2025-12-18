@@ -1,0 +1,465 @@
+---
+id: chapter-2-simulation-basics
+title: "Chapter 2: Simulation Basics with PyBullet"
+description: "Learn to create and control robots in a physics simulation using PyBullet, including object loading, movement, and sensor simulation."
+sidebar_position: 2
+module: 1
+part: 1
+chapter_index: 2
+learning_objectives:
+  - Set up a PyBullet physics simulation environment
+  - Load and manipulate robot models (URDF files)
+  - Apply forces and control joint movements
+  - Understand gravity, collisions, and physics parameters
+  - Simulate sensors in the virtual environment
+prerequisites: [1]
+keywords:
+  - PyBullet
+  - Physics simulation
+  - URDF models
+  - Joint control
+  - Forces
+  - Collisions
+---
+
+# Chapter 2: Simulation Basics with PyBullet
+
+## Introduction
+
+PyBullet is a powerful open-source physics engine widely used in robotics for simulation. It allows you to:
+- Test robot behaviors before deploying to hardware
+- Quickly iterate on control algorithms
+- Simulate complex multi-body interactions
+- Visualize robot movements and sensor data
+
+In this chapter, you'll learn to create a simulated environment and control robots within it.
+
+## Installation
+
+Install PyBullet using pip:
+
+```bash
+pip install pybullet numpy matplotlib
+```
+
+## Creating Your First Simulation
+
+### Basic Setup
+
+```python
+import pybullet as p
+import pybullet_data
+import time
+
+# Connect to PyBullet (GUI mode for visualization)
+physicsClient = p.connect(p.GUI)
+
+# Optional: Connect in DIRECT mode (no GUI, faster)
+# physicsClient = p.connect(p.DIRECT)
+
+# Set gravity
+p.setGravity(0, 0, -9.81)
+
+# Set up the search path for model files
+p.setAdditionalSearchPath(pybullet_data.getDataPath())
+
+# Load the ground plane
+plane_id = p.loadURDF("plane.urdf")
+
+# Create simulation step
+for i in range(1000):
+    p.stepSimulation()
+    time.sleep(1.0 / 240.0)  # 240 Hz simulation frequency
+
+# Disconnect
+p.disconnect()
+```
+
+### Understanding the Coordinate System
+
+PyBullet uses a right-handed coordinate system:
+- **X-axis**: Forward direction
+- **Y-axis**: Left direction
+- **Z-axis**: Up direction (gravity acts downward, -Z)
+
+```
+      Z (up)
+      ^
+      |
+      * --- > X (forward)
+     /
+    /
+   Y (left)
+```
+
+## Loading Robot Models
+
+### Loading URDF Files
+
+URDF (Unified Robot Description Format) files define robot structure:
+
+```python
+import pybullet as p
+import pybullet_data
+import time
+
+physicsClient = p.connect(p.GUI)
+p.setGravity(0, 0, -9.81)
+p.setAdditionalSearchPath(pybullet_data.getDataPath())
+
+# Load ground
+plane_id = p.loadURDF("plane.urdf")
+
+# Load a robot model
+# Start position [x, y, z]
+start_pos = [0, 0, 1]
+# Start orientation (quaternion: x, y, z, w)
+start_orn = p.getQuaternionFromEuler([0, 0, 0])
+
+robot_id = p.loadURDF("r2d2.urdf", start_pos, start_orn)
+
+# Get number of joints
+num_joints = p.getNumJoints(robot_id)
+print(f"Number of joints: {num_joints}")
+
+# Step simulation
+for i in range(10000):
+    p.stepSimulation()
+    time.sleep(1.0 / 240.0)
+
+p.disconnect()
+```
+
+## Joint Control
+
+### Understanding Joints
+
+Each joint has properties you can query:
+
+```python
+import pybullet as p
+import pybullet_data
+
+physicsClient = p.connect(p.GUI)
+p.setGravity(0, 0, -9.81)
+p.setAdditionalSearchPath(pybullet_data.getDataPath())
+
+plane_id = p.loadURDF("plane.urdf")
+robot_id = p.loadURDF("r2d2.urdf", [0, 0, 1], p.getQuaternionFromEuler([0, 0, 0]))
+
+# Get joint information
+num_joints = p.getNumJoints(robot_id)
+
+for i in range(num_joints):
+    info = p.getJointInfo(robot_id, i)
+    print(f"Joint {i}: {info[1].decode('utf-8')}")
+    print(f"  Type: {info[2]}")  # 0=revolute, 1=prismatic, 4=fixed
+    print(f"  Lower limit: {info[8]}")
+    print(f"  Upper limit: {info[9]}")
+    print(f"  Max force: {info[10]}")
+    print(f"  Max velocity: {info[11]}")
+    print()
+```
+
+### Controlling Joint Angles
+
+Move joints to specific positions:
+
+```python
+import pybullet as p
+import pybullet_data
+import time
+import math
+
+physicsClient = p.connect(p.GUI)
+p.setGravity(0, 0, -9.81)
+p.setAdditionalSearchPath(pybullet_data.getDataPath())
+
+plane_id = p.loadURDF("plane.urdf")
+robot_id = p.loadURDF("r2d2.urdf", [0, 0, 1], p.getQuaternionFromEuler([0, 0, 0]))
+
+# Control joint 0 (if it exists)
+target_angle = math.pi / 4  # 45 degrees in radians
+
+# Position control
+p.setJointMotorControl2(
+    bodyUniqueId=robot_id,
+    jointIndex=0,
+    controlMode=p.POSITION_CONTROL,
+    targetPosition=target_angle,
+    force=100,  # Maximum force
+    positionGain=0.1,
+    velocityGain=0.1
+)
+
+# Simulate
+for _ in range(240):  # 1 second at 240 Hz
+    p.stepSimulation()
+    time.sleep(1.0 / 240.0)
+
+p.disconnect()
+```
+
+### Velocity Control
+
+Move joints at a specific speed:
+
+```python
+# Velocity control - move joint at constant speed
+p.setJointMotorControl2(
+    bodyUniqueId=robot_id,
+    jointIndex=0,
+    controlMode=p.VELOCITY_CONTROL,
+    targetVelocity=1.0,  # rad/s
+    force=100  # Maximum force
+)
+```
+
+### Torque Control
+
+Apply direct torque to joints:
+
+```python
+# Torque control - apply direct force/torque
+p.setJointMotorControl2(
+    bodyUniqueId=robot_id,
+    jointIndex=0,
+    controlMode=p.TORQUE_CONTROL,
+    force=50  # Torque in Newton-meters
+)
+```
+
+## Physics Parameters
+
+### Simulation Stepping
+
+Control how physics are computed:
+
+```python
+import pybullet as p
+import pybullet_data
+
+physicsClient = p.connect(p.GUI)
+
+# Set gravity
+p.setGravity(0, 0, -9.81)
+
+# Set time step (default is 1/240)
+p.setPhysicsEngineParameter(
+    fixedTimeStep=1.0/240.0,
+    numSubSteps=1,
+    enableConeFriction=1
+)
+
+# Load models...
+plane_id = p.loadURDF("plane.urdf")
+```
+
+### Friction and Dynamics
+
+Control object properties:
+
+```python
+# Get dynamics info
+dynamics_info = p.getDynamicsInfo(robot_id, -1)  # -1 means base link
+print(f"Mass: {dynamics_info[0]}")
+print(f"Lateral friction: {dynamics_info[1]}")
+print(f"Restitution: {dynamics_info[5]}")
+
+# Change dynamics
+p.changeDynamics(
+    bodyUniqueId=robot_id,
+    linkIndex=-1,  # Base link
+    mass=10,
+    lateralFriction=0.5,
+    spinningFriction=0.001,
+    restitution=0.8  # Bounciness
+)
+```
+
+## Working with Orientations
+
+### Euler Angles vs Quaternions
+
+PyBullet primarily uses quaternions (x, y, z, w) internally but provides conversion utilities:
+
+```python
+import pybullet as p
+import pybullet_data
+import math
+
+physicsClient = p.connect(p.GUI)
+p.setAdditionalSearchPath(pybullet_data.getDataPath())
+
+# Convert Euler angles to quaternion
+euler_angles = [0, math.pi/4, 0]  # Roll, Pitch, Yaw in radians
+quaternion = p.getQuaternionFromEuler(euler_angles)
+print(f"Quaternion: {quaternion}")  # (x, y, z, w)
+
+# Convert quaternion back to Euler angles
+euler_back = p.getEulerFromQuaternion(quaternion)
+print(f"Euler: {euler_back}")
+
+# Load robot with specific orientation
+robot_id = p.loadURDF("r2d2.urdf", [0, 0, 1], quaternion)
+
+p.disconnect()
+```
+
+## Getting Robot State
+
+### Position and Orientation
+
+```python
+import pybullet as p
+import pybullet_data
+
+physicsClient = p.connect(p.GUI)
+p.setAdditionalSearchPath(pybullet_data.getDataPath())
+
+plane_id = p.loadURDF("plane.urdf")
+robot_id = p.loadURDF("r2d2.urdf", [0, 0, 1], p.getQuaternionFromEuler([0, 0, 0]))
+
+# Get base position and orientation
+pos, orn = p.getBasePositionAndOrientation(robot_id)
+print(f"Position: {pos}")  # (x, y, z)
+print(f"Orientation: {orn}")  # (qx, qy, qz, qw)
+
+# Get velocity
+linear_vel, angular_vel = p.getBaseVelocity(robot_id)
+print(f"Linear velocity: {linear_vel}")
+print(f"Angular velocity: {angular_vel}")
+
+p.disconnect()
+```
+
+### Joint State
+
+```python
+import pybullet as p
+import pybullet_data
+
+physicsClient = p.connect(p.GUI)
+p.setAdditionalSearchPath(pybullet_data.getDataPath())
+
+robot_id = p.loadURDF("r2d2.urdf")
+
+# Get state of a specific joint
+joint_index = 0
+joint_state = p.getJointState(robot_id, joint_index)
+print(f"Joint position: {joint_state[0]}")  # angle (radians)
+print(f"Joint velocity: {joint_state[1]}")  # angular velocity
+print(f"Joint reaction force: {joint_state[2]}")  # force/torque at joint
+print(f"Applied motor torque: {joint_state[3]}")
+
+# Get all joint states
+for i in range(p.getNumJoints(robot_id)):
+    state = p.getJointState(robot_id, i)
+    print(f"Joint {i}: angle={state[0]:.2f}, velocity={state[1]:.2f}")
+
+p.disconnect()
+```
+
+## Detecting Collisions
+
+### Contact Information
+
+```python
+import pybullet as p
+import pybullet_data
+import time
+
+physicsClient = p.connect(p.GUI)
+p.setGravity(0, 0, -9.81)
+p.setAdditionalSearchPath(pybullet_data.getDataPath())
+
+plane_id = p.loadURDF("plane.urdf")
+robot_id = p.loadURDF("r2d2.urdf", [0, 0, 1])
+
+# Create an object for collision
+object_id = p.loadURDF("cube_small.urdf", [1, 0, 0.5])
+
+for i in range(5000):
+    p.stepSimulation()
+
+    # Get all contacts between robot and object
+    contacts = p.getContactPoints(bodyA=robot_id, bodyB=object_id)
+
+    if contacts:
+        print(f"Collision detected! {len(contacts)} contact points")
+        for contact in contacts:
+            print(f"  Normal force: {contact[9]}")
+            print(f"  Friction: {contact[10]}")
+
+    time.sleep(1.0 / 240.0)
+
+p.disconnect()
+```
+
+## Complete Example: Walking Robot
+
+Here's a complete example simulating a simple walking motion:
+
+```python
+import pybullet as p
+import pybullet_data
+import time
+import math
+
+# Connect and setup
+physicsClient = p.connect(p.GUI)
+p.setGravity(0, 0, -9.81)
+p.setAdditionalSearchPath(pybullet_data.getDataPath())
+
+# Load environment
+plane_id = p.loadURDF("plane.urdf")
+robot_id = p.loadURDF("r2d2.urdf", [0, 0, 0.5])
+
+# Simulation parameters
+num_steps = 2400  # 10 seconds at 240 Hz
+frequency = 0.5  # Walking frequency (Hz)
+amplitude = 0.5  # Joint movement amplitude (radians)
+
+# Main simulation loop
+for step in range(num_steps):
+    # Calculate target angles using sine wave for smooth walking
+    time_sec = step / 240.0
+    wave = math.sin(2 * math.pi * frequency * time_sec)
+    target_angle = amplitude * wave
+
+    # Apply to joint 0
+    if p.getNumJoints(robot_id) > 0:
+        p.setJointMotorControl2(
+            bodyUniqueId=robot_id,
+            jointIndex=0,
+            controlMode=p.POSITION_CONTROL,
+            targetPosition=target_angle,
+            force=100
+        )
+
+    # Step simulation
+    p.stepSimulation()
+    time.sleep(1.0 / 240.0)
+
+    # Print status every second
+    if step % 240 == 0:
+        pos, _ = p.getBasePositionAndOrientation(robot_id)
+        print(f"Time: {time_sec:.1f}s, Position: ({pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f})")
+
+p.disconnect()
+```
+
+## Summary Table
+
+| Feature | Function | Example |
+|---------|----------|---------|
+| Connect | `p.connect(mode)` | `p.connect(p.GUI)` |
+| Load URDF | `p.loadURDF(path)` | `robot_id = p.loadURDF("robot.urdf")` |
+| Joint control | `p.setJointMotorControl2()` | Position, velocity, or torque control |
+| Get state | `p.getJointState()` | Get joint angles and velocities |
+| Collision detect | `p.getContactPoints()` | Detect interactions between objects |
+| Dynamics | `p.changeDynamics()` | Modify mass, friction, restitution |
+
+## Next Steps
+
+Now that you can simulate robots, the next chapter will cover the mathematics behind robotics, including transformations, angles, and kinematics that are essential for more advanced control.

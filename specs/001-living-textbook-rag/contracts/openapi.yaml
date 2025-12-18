@@ -1,0 +1,385 @@
+openapi: 3.1.0
+info:
+  title: Living Textbook RAG API
+  description: Backend API for the Physical AI & Humanoid Robotics Living Textbook with RAG Teaching Assistant
+  version: 1.0.0
+  contact:
+    name: Physical AI Hackathon Team
+    url: https://github.com/GIAIC-Hackathone/Physical-AI---Humanoid-Robotics-Book
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://api.livingtextbook.example.com
+    description: Production server (placeholder)
+
+paths:
+  /api/chat:
+    post:
+      summary: Answer a student's question about textbook content
+      description: |
+        Accepts a student query and optional context (highlighted text, chapter ID).
+        Returns an AI-generated answer grounded in the textbook, with source attribution.
+
+        Flow:
+        1. Embed query using OpenAI
+        2. Vector search in Qdrant (top 5 chunks)
+        3. Generate response using GPT-4o-mini
+        4. Validate response (book-only content)
+        5. Log to PostgreSQL
+        6. Stream response to frontend
+      operationId: chat_post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '400':
+          description: Bad request (empty query, invalid JSON, invalid session_id)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded (100 queries/hour per session)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Service unavailable (Qdrant down, OpenAI rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      tags:
+        - Chat
+
+  /api/ingest:
+    post:
+      summary: Update Qdrant with latest book content
+      description: |
+        Admin-only endpoint to ingest/update textbook chapters into Qdrant vector database.
+        Reads all .mdx files from frontend/docs/, chunks content, generates embeddings, and upserts to Qdrant.
+
+        Prerequisites:
+        - All 16 chapters must exist in /frontend/docs/
+        - Each chapter must have YAML frontmatter with metadata
+        - Valid admin_token required (bearer auth)
+      operationId: ingest_post
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestRequest'
+      responses:
+        '200':
+          description: Ingestion completed (success, partial, or failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResponse'
+        '400':
+          description: Bad request (missing or invalid request body)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (invalid or missing admin token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error during ingestion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      tags:
+        - Admin
+
+  /api/health:
+    get:
+      summary: Health check endpoint
+      description: |
+        Returns health status of the system and its dependencies.
+        Used by deployment monitoring and load balancers.
+      operationId: health_get
+      responses:
+        '200':
+          description: System is healthy or degraded but operational
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: System is unhealthy (critical dependency down)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+      tags:
+        - System
+
+  /api/metadata:
+    get:
+      summary: Retrieve metadata about available chapters and keywords
+      description: |
+        Returns list of all 16 chapters with titles, module/part IDs, and keywords.
+        Used by frontend for search filters and navigation.
+      operationId: metadata_get
+      parameters:
+        - in: query
+          name: module_id
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 4
+          description: Optional filter by module (1-4)
+      responses:
+        '200':
+          description: Metadata retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataResponse'
+      tags:
+        - Metadata
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer token for admin endpoints (format: "Bearer <token>")
+
+  schemas:
+    # Request/Response Objects
+
+    ChatRequest:
+      type: object
+      required:
+        - query_text
+      properties:
+        query_text:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: The student's question about the textbook
+          example: "How do I implement a PID controller in Python?"
+        highlighted_context:
+          type: string
+          nullable: true
+          description: Optional text the student highlighted in the book
+          example: "A servo motor uses feedback control to maintain position"
+        chapter_context:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 16
+          description: Optional chapter index (1-16) for context prioritization
+          example: 6
+        session_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Optional session ID. If not provided, a new session will be created.
+          example: "550e8400-e29b-41d4-a716-446655440000"
+
+    ChatResponse:
+      type: object
+      required:
+        - response_text
+        - source_chapters
+        - confidence_score
+        - session_id
+        - timestamp
+      properties:
+        response_text:
+          type: string
+          description: AI-generated answer grounded in textbook content
+          example: "To implement a PID controller in Python:\n1. Calculate error: error = setpoint - current\n2. Apply PID formula: output = Kp*error + Ki*∑error + Kd*d(error)/dt\n\nHere's example code..."
+        source_chapters:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                example: 6
+              title:
+                type: string
+                example: "Servo Motors and Control"
+          description: Which chapters were used to generate this response
+        confidence_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Confidence that response is accurate (0.0-1.0)
+          example: 0.92
+        session_id:
+          type: string
+          format: uuid
+          description: Session ID for this conversation
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO8601 timestamp of response
+          example: "2025-12-18T10:15:00Z"
+
+    IngestRequest:
+      type: object
+      required:
+        - force_refresh
+      properties:
+        force_refresh:
+          type: boolean
+          description: If true, delete all existing vectors and re-ingest from scratch. If false, only update modified chapters.
+          example: false
+
+    IngestResponse:
+      type: object
+      required:
+        - status
+        - chapters_processed
+        - chunks_created
+        - duration_seconds
+      properties:
+        status:
+          type: string
+          enum:
+            - success
+            - partial
+            - failed
+          description: Overall status of the ingestion run
+          example: success
+        chapters_processed:
+          type: integer
+          minimum: 0
+          description: Number of chapters processed
+          example: 16
+        chunks_created:
+          type: integer
+          minimum: 0
+          description: Total chunks created or updated
+          example: 450
+        duration_seconds:
+          type: number
+          format: float
+          minimum: 0
+          description: How long the ingest took
+          example: 45.3
+        error_message:
+          type: string
+          nullable: true
+          description: Error details if status is 'failed' or 'partial'
+          example: null
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - qdrant_status
+        - postgres_status
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+          description: Overall system status
+          example: healthy
+        qdrant_status:
+          type: string
+          enum:
+            - ok
+            - offline
+          description: Qdrant Cloud connectivity
+          example: ok
+        postgres_status:
+          type: string
+          enum:
+            - ok
+            - offline
+          description: Neon PostgreSQL connectivity
+          example: ok
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO8601 timestamp of health check
+          example: "2025-12-18T10:20:00Z"
+
+    MetadataResponse:
+      type: object
+      required:
+        - chapters
+      properties:
+        chapters:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                minimum: 1
+                maximum: 16
+                description: Global chapter index (1-16)
+                example: 6
+              title:
+                type: string
+                description: Chapter title
+                example: "Servo Motors and Control"
+              module_id:
+                type: integer
+                minimum: 1
+                maximum: 4
+                description: Module number (1-4)
+                example: 2
+              part_id:
+                type: integer
+                minimum: 1
+                maximum: 4
+                description: Part within module (1-4)
+                example: 2
+              keywords:
+                type: array
+                items:
+                  type: string
+                description: Search keywords for this chapter
+                example: ["servo", "PID", "control", "motor"]
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code or type
+          example: "rate_limit_exceeded"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "You have exceeded the rate limit of 100 queries per hour"
+        details:
+          type: object
+          nullable: true
+          description: Additional error context
+          example: { "retry_after": 3600 }

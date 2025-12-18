@@ -1,0 +1,287 @@
+---
+id: chapter-12-neural-networks
+title: "Chapter 12: Neural Networks for Robotics"
+description: "Advanced neural network architectures for robot perception, control, and learning."
+sidebar_position: 12
+module: 3
+part: 2
+chapter_index: 12
+learning_objectives:
+  - Understand different network architectures (RNN, LSTM, Transformer)
+  - Implement recurrent networks for temporal control
+  - Use attention mechanisms for robot focus
+  - Combine vision and control networks
+  - Deploy end-to-end learning systems
+prerequisites: [10, 11]
+keywords:
+  - RNN
+  - LSTM
+  - Attention
+  - End-to-end learning
+  - Multimodal networks
+---
+
+# Chapter 12: Neural Networks for Robotics
+
+## Recurrent Neural Networks (RNN)
+
+```python
+import torch
+import torch.nn as nn
+
+class SimpleRNN(nn.Module):
+    """RNN for sequential robot control."""
+
+    def __init__(self, input_size, hidden_size, output_size):
+        super(SimpleRNN, self).__init__()
+
+        self.rnn = nn.RNN(input_size, hidden_size, batch_first=True)
+        self.fc = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x, h=None):
+        # x: (batch, seq_len, input_size)
+        out, h = self.rnn(x, h)
+        # out: (batch, seq_len, hidden_size)
+
+        out = self.fc(out[:, -1, :])  # Use last output
+        return out, h
+
+# Usage: Predicting next robot action from history
+model = SimpleRNN(input_size=4, hidden_size=32, output_size=2)
+seq_input = torch.randn(1, 10, 4)  # Batch=1, Seq=10, Input=4
+
+output, hidden = model(seq_input)
+print(f"Output: {output.shape}")
+```
+
+## LSTM for Temporal Dependencies
+
+```python
+class RobotLSTM(nn.Module):
+    """LSTM for learning robot manipulation sequences."""
+
+    def __init__(self, input_size, hidden_size, num_layers, output_size):
+        super(RobotLSTM, self).__init__()
+
+        self.lstm = nn.LSTM(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=0.2
+        )
+
+        self.fc1 = nn.Linear(hidden_size, 128)
+        self.fc2 = nn.Linear(128, output_size)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        # x: (batch, seq_len, input_size)
+        lstm_out, (h, c) = self.lstm(x)
+        # lstm_out: (batch, seq_len, hidden_size)
+
+        out = self.relu(self.fc1(lstm_out[:, -1, :]))
+        out = self.fc2(out)
+
+        return out
+
+# Training on robot trajectory data
+model = RobotLSTM(input_size=6, hidden_size=64, num_layers=2, output_size=3)
+
+# Simulated sensor data: (batch, time_steps, features)
+sensor_sequence = torch.randn(32, 20, 6)
+prediction = model(sensor_sequence)
+print(f"Control prediction: {prediction.shape}")  # (32, 3)
+```
+
+## Attention Mechanisms
+
+```python
+class AttentionHead(nn.Module):
+    """Single attention head for robot perception."""
+
+    def __init__(self, hidden_size):
+        super(AttentionHead, self).__init__()
+
+        self.query = nn.Linear(hidden_size, hidden_size)
+        self.key = nn.Linear(hidden_size, hidden_size)
+        self.value = nn.Linear(hidden_size, hidden_size)
+
+    def forward(self, x):
+        # x: (batch, seq_len, hidden_size)
+
+        Q = self.query(x)
+        K = self.key(x)
+        V = self.value(x)
+
+        # Attention scores
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / (x.size(-1) ** 0.5)
+        attention = torch.softmax(scores, dim=-1)
+
+        # Apply attention to values
+        output = torch.matmul(attention, V)
+
+        return output
+
+class TransformerRobotController(nn.Module):
+    """Transformer for robot control."""
+
+    def __init__(self, input_size, hidden_size, num_heads, output_size):
+        super(TransformerRobotController, self).__init__()
+
+        self.embedding = nn.Linear(input_size, hidden_size)
+
+        self.transformer = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(
+                d_model=hidden_size,
+                nhead=num_heads,
+                dim_feedforward=256,
+                batch_first=True
+            ),
+            num_layers=2
+        )
+
+        self.output_head = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        # x: (batch, seq_len, input_size)
+
+        x = self.embedding(x)
+        x = self.transformer(x)
+        x = self.output_head(x[:, -1, :])
+
+        return x
+
+# Usage
+controller = TransformerRobotController(input_size=6, hidden_size=64, num_heads=4, output_size=3)
+sensor_data = torch.randn(8, 15, 6)  # Batch=8, Seq=15, Features=6
+control_signal = controller(sensor_data)
+```
+
+## Vision-Motor Integration
+
+```python
+class VisionMotorNet(nn.Module):
+    """End-to-end network: camera -> control actions."""
+
+    def __init__(self):
+        super(VisionMotorNet, self).__init__()
+
+        # Vision branch
+        self.vision_conv1 = nn.Conv2d(3, 32, 3, padding=1)
+        self.vision_conv2 = nn.Conv2d(32, 64, 3, padding=1)
+        self.vision_pool = nn.MaxPool2d(2, 2)
+        self.vision_fc = nn.Linear(64 * 8 * 8, 128)
+
+        # Sensor branch (IMU, proprioception)
+        self.sensor_fc1 = nn.Linear(9, 64)
+        self.sensor_fc2 = nn.Linear(64, 128)
+
+        # Fusion
+        self.fusion_fc1 = nn.Linear(256, 256)
+        self.fusion_fc2 = nn.Linear(256, 128)
+
+        # Control output
+        self.control_head = nn.Linear(128, 6)  # 6 joint angles
+
+        self.relu = nn.ReLU()
+
+    def forward(self, image, sensor_data):
+        # Process image
+        x_vis = self.relu(self.vision_conv1(image))
+        x_vis = self.vision_pool(x_vis)
+        x_vis = self.relu(self.vision_conv2(x_vis))
+        x_vis = self.vision_pool(x_vis)
+        x_vis = x_vis.view(x_vis.size(0), -1)
+        x_vis = self.relu(self.vision_fc(x_vis))
+
+        # Process sensor
+        x_sens = self.relu(self.sensor_fc1(sensor_data))
+        x_sens = self.relu(self.sensor_fc2(x_sens))
+
+        # Fuse modalities
+        x_fused = torch.cat([x_vis, x_sens], dim=1)
+        x_fused = self.relu(self.fusion_fc1(x_fused))
+        x_fused = self.relu(self.fusion_fc2(x_fused))
+
+        # Output control
+        control = self.control_head(x_fused)
+
+        return control
+
+# Training end-to-end
+model = VisionMotorNet()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+criterion = nn.MSELoss()
+
+# Simulated data
+images = torch.randn(16, 3, 32, 32)
+sensor_data = torch.randn(16, 9)
+target_control = torch.randn(16, 6)
+
+# Forward pass
+predictions = model(images, sensor_data)
+loss = criterion(predictions, target_control)
+
+# Backward pass
+optimizer.zero_grad()
+loss.backward()
+optimizer.step()
+
+print(f"Loss: {loss.item():.4f}")
+```
+
+## Sequence Prediction
+
+```python
+class SequencePredictor(nn.Module):
+    """Predict future robot trajectory."""
+
+    def __init__(self, input_size, hidden_size, predict_steps):
+        super(SequencePredictor, self).__init__()
+
+        self.encoder = nn.LSTM(input_size, hidden_size, batch_first=True)
+
+        self.decoder = nn.LSTMCell(input_size, hidden_size)
+
+        self.output_layer = nn.Linear(hidden_size, input_size)
+        self.predict_steps = predict_steps
+
+    def forward(self, input_seq):
+        # Encode
+        _, (h, c) = self.encoder(input_seq)
+
+        # Decode and predict future
+        predictions = []
+        x = input_seq[:, -1, :]  # Last input
+
+        for _ in range(self.predict_steps):
+            h, c = self.decoder(x, (h, c))
+            x = self.output_layer(h)
+            predictions.append(x.unsqueeze(1))
+
+        predictions = torch.cat(predictions, dim=1)
+        return predictions
+
+# Predict 5 steps ahead
+model = SequencePredictor(input_size=6, hidden_size=32, predict_steps=5)
+
+past_trajectory = torch.randn(8, 10, 6)  # 8 batch, 10 past steps, 6 features
+future_prediction = model(past_trajectory)
+
+print(f"Predicted {future_prediction.shape[1]} future steps")
+```
+
+## Summary
+
+| Architecture | Use Case |
+|--------------|----------|
+| RNN | Sequential decisions |
+| LSTM | Long-term dependencies |
+| Transformer | Attention-based control |
+| CNN-LSTM | Vision + sequences |
+| End-to-end | Direct camera→control |
+
+## Next Steps
+
+Now you're ready for the final module on humanoid robot control algorithms and integration!
