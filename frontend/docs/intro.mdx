@@ -2,41 +2,140 @@
 sidebar_position: 1
 ---
 
+import {ModuleCard} from '@site/src/components/ModuleCard';
+import {FeaturesShowcase} from '@site/src/components/FeaturesShowcase';
+
 # Welcome to the Living Textbook
 
 ## Physical AI & Humanoid Robotics
 
-This is a **"Living Textbook"** – an interactive, AI-powered learning platform that combines comprehensive curriculum on Physical AI and Humanoid Robotics with an intelligent Teaching Assistant.
+This is a **"Living Textbook"** – an interactive, AI-powered learning platform that combines comprehensive curriculum on Physical AI and Humanoid Robotics with an intelligent Teaching Assistant powered by advanced RAG (Retrieval-Augmented Generation) technology.
 
-### What You'll Learn
+---
 
-- **Module 1: Foundations** – Python, simulation, mathematics, and tools
-- **Module 2: The Body** – Sensors, actuators, URDF, and kinematics
-- **Module 3: The Brain** – Computer vision, PyTorch, and reinforcement learning
-- **Module 4: Humanoid Control** – Walking, grasping, and agentic behaviors
+## 📚 Choose Your Learning Path
 
-### Features
+Explore our 4 carefully designed modules that take you from fundamental concepts to advanced humanoid robotics control:
 
-💬 **Ask the Teaching Assistant** – Highlight any text in the book and ask questions about it. The AI will provide answers grounded in the textbook content.
+<div style={{display: 'flex', gap: '20px', flexWrap: 'wrap', justifyContent: 'center', margin: '40px 0'}}>
+  <ModuleCard
+    title="Module 1: Foundations"
+    description="Master Python programming, simulation basics, essential mathematics, and robotics development tools"
+    chapters={4}
+    icon="🏗️"
+    href="/docs/module-1/chapter-1-python-intro"
+    color="blue"
+  />
+  <ModuleCard
+    title="Module 2: The Body"
+    description="Explore sensors, actuators, URDF modeling, and forward/inverse kinematics fundamentals"
+    chapters={4}
+    icon="🤖"
+    href="/docs/module-2/chapter-5-sensors-overview"
+    color="emerald"
+  />
+  <ModuleCard
+    title="Module 3: The Brain"
+    description="Learn computer vision, PyTorch deep learning, reinforcement learning, and neural network architectures"
+    chapters={4}
+    icon="🧠"
+    href="/docs/module-3/chapter-9-computer-vision"
+    color="purple"
+  />
+  <ModuleCard
+    title="Module 4: Humanoid Control"
+    description="Build advanced systems for locomotion, manipulation, agentic behaviors, and integrated robotics"
+    chapters={4}
+    icon="🚀"
+    href="/docs/module-4/chapter-13-walking-locomotion"
+    color="orange"
+  />
+</div>
 
-📚 **16 Comprehensive Chapters** – Organized in 4 modules with 4 chapters each, covering everything from fundamentals to advanced topics.
+---
 
-📊 **Track Your Learning** – See your learning progress, questions asked, and topics explored across sessions.
+<FeaturesShowcase />
 
-### Getting Started
+---
 
-1. Navigate to **Module 1: Foundations** to begin
-2. Read through the chapters
-3. Use the AI assistant (💬 button) to ask questions
-4. Highlight important passages and explore related concepts
-5. View your session history to track progress
+## 🚀 Quick Start Guide
 
-### How to Use the AI Assistant
+### Step 1: Choose Your Module
+Start with **Module 1: Foundations** if you're new to robotics, or jump to any module that interests you most.
 
-- **Without Highlighting**: Ask a general question about any topic in the textbook
-- **With Highlighting**: Select text in the book, then click "Ask AI about this" to ask context-specific questions
-- **Response Quality**: The AI will only answer based on textbook content – if information isn't in the book, it will let you know
+### Step 2: Follow the Curriculum
+Each chapter includes:
+- **Learning Objectives** – Clear goals for what you'll learn
+- **Core Concepts** – In-depth explanations with examples
+- **Code Examples** – Practical Python and simulation code
+- **Hands-on Exercises** – Reinforce your learning
+- **Prerequisites** – Know what you should learn first
+
+### Step 3: Use the AI Assistant
+- 💬 **Highlight and Ask** – Select any text and click "Ask AI" for context-aware answers
+- 🤔 **General Questions** – Ask about topics without highlighting
+- 📖 **Get Sources** – AI responses include references to relevant textbook sections
+
+### Step 4: Track Progress
+Monitor your learning journey with:
+- Session history of all questions asked
+- Topics you've explored
+- Time spent in each chapter
+- Learning milestones achieved
+
+---
+
+## 💡 How the AI Assistant Works
+
+Our Teaching Assistant uses **Retrieval-Augmented Generation (RAG)** to provide accurate, grounded answers:
+
+1. **Your Input** – Ask a question or highlight text from the textbook
+2. **Smart Retrieval** – AI finds relevant chapters and sections
+3. **Context-Aware Response** – Get answers grounded in the textbook content
+4. **Source Attribution** – See exactly where the answer comes from
+5. **Learning Reinforcement** – Build deeper understanding through dialogue
+
+**Key Benefits:**
+- ✅ Answers are always based on textbook content
+- ✅ Get clarifications on complex concepts
+- ✅ Explore related topics and prerequisites
+- ✅ Learn at your own pace with personalized guidance
+- ✅ Access expert knowledge directly from course materials
+
+---
+
+## 📖 Textbook Structure
+
+| Module | Focus | Chapters | Duration |
+|--------|-------|----------|----------|
+| **1: Foundations** | Python, Simulation, Math, Tools | 1-4 | ~2 weeks |
+| **2: The Body** | Sensors, Actuators, Kinematics | 5-8 | ~2 weeks |
+| **3: The Brain** | Computer Vision, ML, RL | 9-12 | ~3 weeks |
+| **4: Humanoid Control** | Walking, Grasping, Integration | 13-16 | ~3 weeks |
+
+---
+
+## 🎯 Learning Outcomes
+
+By completing this Living Textbook, you will:
+
+- ✓ Write Python code for robotics simulations and control
+- ✓ Design and analyze robotic systems using URDF models
+- ✓ Implement computer vision and deep learning for robots
+- ✓ Build reinforcement learning agents for robotics tasks
+- ✓ Develop control algorithms for humanoid locomotion and manipulation
+- ✓ Integrate multiple subsystems into complete robotic applications
+
+---
+
+## 💬 Get Started Now
+
+**Ready to dive in?** Start with your favorite module above, or begin with [Chapter 1: Python Fundamentals](/docs/module-1/chapter-1-python-intro) if you're new to robotics.
+
+**Questions?** Use the AI Teaching Assistant at the top of any chapter – it's ready to help!
 
 ---
 
 **Happy Learning! 🚀**
+
+*The future of robotics is in your hands. Let's build it together.*
