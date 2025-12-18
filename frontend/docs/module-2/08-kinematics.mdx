@@ -1,0 +1,555 @@
+---
+id: chapter-8-kinematics
+title: "Chapter 8: Forward & Inverse Kinematics"
+description: "Master forward and inverse kinematics to calculate robot end-effector positions and solve for joint angles."
+sidebar_position: 8
+module: 2
+part: 2
+chapter_index: 8
+learning_objectives:
+  - Calculate forward kinematics (joint angles → end-effector position)
+  - Solve inverse kinematics (end-effector position → joint angles)
+  - Understand Denavit-Hartenberg (DH) parameters
+  - Implement numerical IK solvers
+  - Handle multiple IK solutions
+prerequisites: [3, 7]
+keywords:
+  - Forward kinematics
+  - Inverse kinematics
+  - DH parameters
+  - Jacobian
+  - Numerical methods
+  - End-effector
+---
+
+# Chapter 8: Forward & Inverse Kinematics
+
+## Introduction
+
+**Kinematics** is the study of motion without considering forces. For robots:
+- **Forward Kinematics (FK)**: Given joint angles → Calculate end-effector position
+- **Inverse Kinematics (IK)**: Given desired position → Calculate required joint angles
+
+These are fundamental for robot control and path planning.
+
+## Forward Kinematics
+
+### Concept
+
+Forward kinematics chains transformations through the robot structure:
+
+```
+Base → Joint1 → Link1 → Joint2 → Link2 → ... → EndEffector
+```
+
+Each transformation is a 4×4 homogeneous matrix combining rotation and translation.
+
+### Simple 2D Example
+
+For a 2-link arm in the XY plane:
+
+```
+Link 1: length L1, angle θ1
+Link 2: length L2, angle θ2 (relative to link 1)
+
+End-effector position:
+x = L1*cos(θ1) + L2*cos(θ1 + θ2)
+y = L1*sin(θ1) + L2*sin(θ1 + θ2)
+```
+
+**Python Implementation:**
+
+```python
+import numpy as np
+import math
+
+def forward_kinematics_2link(theta1, theta2, L1=1.0, L2=0.8):
+    """Calculate end-effector position for 2-link arm."""
+    # Position of joint 2
+    x1 = L1 * math.cos(theta1)
+    y1 = L1 * math.sin(theta1)
+
+    # Position of end-effector
+    x_ee = x1 + L2 * math.cos(theta1 + theta2)
+    y_ee = y1 + L2 * math.sin(theta1 + theta2)
+
+    return x_ee, y_ee
+
+# Example: θ1 = 45°, θ2 = 30°
+theta1 = math.radians(45)
+theta2 = math.radians(30)
+x, y = forward_kinematics_2link(theta1, theta2)
+print(f"End-effector position: ({x:.2f}, {y:.2f})")
+```
+
+### 3D Forward Kinematics with Matrices
+
+For a 3-link arm:
+
+```python
+import numpy as np
+import math
+
+def homogeneous_transform(x, y, z, theta, axis):
+    """
+    Create homogeneous transformation matrix.
+    theta: rotation angle (radians)
+    axis: 'x', 'y', or 'z'
+    """
+    T = np.eye(4)
+
+    if axis == 'z':
+        c, s = math.cos(theta), math.sin(theta)
+        R = np.array([
+            [c, -s, 0],
+            [s, c, 0],
+            [0, 0, 1]
+        ])
+    elif axis == 'y':
+        c, s = math.cos(theta), math.sin(theta)
+        R = np.array([
+            [c, 0, s],
+            [0, 1, 0],
+            [-s, 0, c]
+        ])
+    elif axis == 'x':
+        c, s = math.cos(theta), math.sin(theta)
+        R = np.array([
+            [1, 0, 0],
+            [0, c, -s],
+            [0, s, c]
+        ])
+
+    T[:3, :3] = R
+    T[:3, 3] = [x, y, z]
+    return T
+
+def forward_kinematics_3link(theta1, theta2, theta3):
+    """Calculate 3-link arm end-effector (using matrix multiplication)."""
+    L1, L2, L3 = 1.0, 0.8, 0.6
+
+    # Transform from base to joint 1 (rotation around Z)
+    T01 = homogeneous_transform(0, 0, 0, theta1, 'z')
+
+    # Transform from joint 1 to link 1 (translation along X)
+    T12 = homogeneous_transform(L1, 0, 0, theta2, 'z')
+
+    # Transform from link 1 to link 2 (translation along X)
+    T23 = homogeneous_transform(L2, 0, 0, theta3, 'z')
+
+    # Transform to end-effector
+    T03 = np.matmul(T01, np.matmul(T12, T23))
+
+    # Extract end-effector position
+    position = T03[:3, 3]
+    return position
+
+# Test
+theta1 = math.radians(30)
+theta2 = math.radians(45)
+theta3 = math.radians(-20)
+pos = forward_kinematics_3link(theta1, theta2, theta3)
+print(f"End-effector: {pos}")
+```
+
+### Denavit-Hartenberg (DH) Parameters
+
+The DH convention standardizes kinematic descriptions:
+
+| Parameter | Meaning |
+|-----------|---------|
+| a | Link length (distance along joint axis) |
+| α | Link twist (rotation around joint axis) |
+| d | Link offset (distance along common normal) |
+| θ | Joint angle |
+
+**DH Transformation:**
+```python
+def dh_transform(a, alpha, d, theta):
+    """Create transformation matrix from DH parameters."""
+    c_theta = math.cos(theta)
+    s_theta = math.sin(theta)
+    c_alpha = math.cos(alpha)
+    s_alpha = math.sin(alpha)
+
+    T = np.array([
+        [c_theta, -s_theta*c_alpha, s_theta*s_alpha, a*c_theta],
+        [s_theta, c_theta*c_alpha, -c_theta*s_alpha, a*s_theta],
+        [0, s_alpha, c_alpha, d],
+        [0, 0, 0, 1]
+    ])
+    return T
+
+# Example 3R arm DH table:
+# i | a_i | alpha_i | d_i | theta_i
+# 1 | 0   | 0       | 0   | theta1
+# 2 | L1  | 0       | 0   | theta2
+# 3 | L2  | 0       | 0   | theta3
+
+def forward_kinematics_dh(thetas, dh_params):
+    """Calculate FK using DH parameters."""
+    T = np.eye(4)
+
+    for i in range(len(thetas)):
+        a, alpha, d = dh_params[i]
+        theta = thetas[i]
+
+        Ti = dh_transform(a, alpha, d, theta)
+        T = np.matmul(T, Ti)
+
+    return T
+
+dh_params = [
+    (0, 0, 0),      # Joint 1
+    (1.0, 0, 0),    # Link 1, length = 1.0
+    (0.8, 0, 0),    # Link 2, length = 0.8
+]
+
+thetas = [
+    math.radians(30),
+    math.radians(45),
+    math.radians(-20)
+]
+
+T_end = forward_kinematics_dh(thetas, dh_params)
+print(f"End-effector transform:\n{T_end}")
+print(f"Position: {T_end[:3, 3]}")
+```
+
+## Inverse Kinematics
+
+### Concept
+
+Inverse kinematics solves: Given target position/orientation, find joint angles.
+
+**Challenge**: Multiple solutions often exist (or none at all).
+
+### Analytical IK for 2-Link Arm
+
+```python
+def inverse_kinematics_2link(x, y, L1=1.0, L2=0.8):
+    """
+    Analytical IK for 2-link arm.
+    Returns all possible solutions (elbow-up and elbow-down).
+    """
+    d = math.sqrt(x**2 + y**2)
+
+    # Check if position is reachable
+    if d > L1 + L2 or d < abs(L1 - L2):
+        return None  # Unreachable
+
+    # Law of cosines: find theta2
+    cos_theta2 = (d**2 - L1**2 - L2**2) / (2 * L1 * L2)
+    cos_theta2 = max(-1, min(1, cos_theta2))  # Clamp for numerical stability
+
+    theta2_pos = math.acos(cos_theta2)    # Elbow up
+    theta2_neg = -math.acos(cos_theta2)   # Elbow down
+
+    solutions = []
+
+    for theta2 in [theta2_pos, theta2_neg]:
+        # Find theta1 using arctan
+        k1 = L1 + L2 * math.cos(theta2)
+        k2 = L2 * math.sin(theta2)
+
+        theta1 = math.atan2(y, x) - math.atan2(k2, k1)
+
+        solutions.append((theta1, theta2))
+
+    return solutions
+
+# Example: reach position (1.2, 0.8)
+target_x, target_y = 1.2, 0.8
+solutions = inverse_kinematics_2link(target_x, target_y)
+
+if solutions:
+    for i, (theta1, theta2) in enumerate(solutions):
+        print(f"Solution {i+1}:")
+        print(f"  θ1 = {math.degrees(theta1):.1f}°")
+        print(f"  θ2 = {math.degrees(theta2):.1f}°")
+
+        # Verify with forward kinematics
+        x, y = forward_kinematics_2link(theta1, theta2)
+        print(f"  Verification: ({x:.2f}, {y:.2f})")
+else:
+    print("Position unreachable")
+```
+
+### Numerical IK with Jacobian
+
+For complex robots without closed-form solutions, use numerical methods:
+
+```python
+import numpy as np
+from scipy.optimize import minimize
+
+class RobotIKSolver:
+    """Solve inverse kinematics numerically."""
+
+    def __init__(self, forward_kinematics_func, num_joints):
+        self.fk = forward_kinematics_func
+        self.num_joints = num_joints
+
+    def compute_jacobian(self, thetas, delta=1e-6):
+        """Compute Jacobian matrix numerically."""
+        J = np.zeros((3, self.num_joints))
+
+        fk_current = self.fk(thetas)
+
+        for i in range(self.num_joints):
+            thetas_delta = thetas.copy()
+            thetas_delta[i] += delta
+
+            fk_delta = self.fk(thetas_delta)
+
+            # Finite difference
+            J[:, i] = (fk_delta - fk_current) / delta
+
+        return J
+
+    def solve(self, target_pos, initial_guess=None, max_iterations=100):
+        """
+        Solve IK using Jacobian transpose method.
+        """
+        if initial_guess is None:
+            thetas = np.zeros(self.num_joints)
+        else:
+            thetas = np.array(initial_guess)
+
+        learning_rate = 0.1
+
+        for iteration in range(max_iterations):
+            # Forward kinematics
+            current_pos = self.fk(thetas)
+
+            # Error
+            error = target_pos - current_pos
+            error_norm = np.linalg.norm(error)
+
+            if error_norm < 1e-4:  # Converged
+                return thetas, True
+
+            # Jacobian
+            J = self.compute_jacobian(thetas)
+
+            # Jacobian transpose method
+            # Δθ = α * J^T * e
+            dtheta = learning_rate * J.T @ error
+
+            # Update
+            thetas += dtheta
+
+        return thetas, False
+
+# Define simple 3-link arm FK
+def fk_3link(thetas):
+    L1, L2, L3 = 1.0, 0.8, 0.6
+    x = L1*np.cos(thetas[0]) + L2*np.cos(thetas[0]+thetas[1]) + L3*np.cos(thetas[0]+thetas[1]+thetas[2])
+    y = L1*np.sin(thetas[0]) + L2*np.sin(thetas[0]+thetas[1]) + L3*np.sin(thetas[0]+thetas[1]+thetas[2])
+    z = 0
+    return np.array([x, y, z])
+
+# Solve IK
+solver = RobotIKSolver(fk_3link, num_joints=3)
+target = np.array([1.5, 0.8, 0])
+solution, converged = solver.solve(target)
+
+print(f"Converged: {converged}")
+print(f"Joint angles: {np.degrees(solution)}")
+print(f"End-effector: {fk_3link(solution)}")
+```
+
+### Damped Least Squares IK
+
+Improve numerical stability:
+
+```python
+def damped_least_squares_ik(J, target_error, damping=0.01):
+    """
+    Solve using damped least squares.
+    Better numerical stability than Jacobian transpose.
+    """
+    # (J^T*J + λ*I)^-1 * J^T * e
+    JT = J.T
+    m, n = J.shape
+
+    A = JT @ J + damping**2 * np.eye(n)
+    b = JT @ target_error
+
+    dtheta = np.linalg.solve(A, b)
+    return dtheta
+
+# Usage in solver
+def solve_with_dls(thetas, target_pos, damping=0.01, max_iter=100):
+    for _ in range(max_iter):
+        current_pos = fk_3link(thetas)
+        error = target_pos - current_pos
+
+        if np.linalg.norm(error) < 1e-4:
+            break
+
+        J = compute_jacobian(thetas)
+        dtheta = damped_least_squares_ik(J, error, damping)
+
+        thetas += 0.1 * dtheta
+
+    return thetas
+```
+
+## Singularities and Workspace
+
+### Singularities
+
+Positions where the robot loses degrees of freedom (determinant of Jacobian = 0):
+
+```python
+def is_singular(J, threshold=1e-3):
+    """Check if current configuration is near singular."""
+    det = np.linalg.det(J[:3, :3])
+    return abs(det) < threshold
+
+def manipulability(J):
+    """Calculate manipulability index (0 to 1)."""
+    det = np.linalg.det(J @ J.T)
+    return math.sqrt(det) if det >= 0 else 0
+```
+
+### Workspace Visualization
+
+```python
+def plot_workspace_2d(L1=1.0, L2=0.8, num_samples=50):
+    """Visualize 2-link arm workspace."""
+    import matplotlib.pyplot as plt
+
+    positions = []
+
+    for theta1 in np.linspace(0, 2*np.pi, num_samples):
+        for theta2 in np.linspace(-np.pi, np.pi, num_samples):
+            x, y = forward_kinematics_2link(theta1, theta2, L1, L2)
+            positions.append([x, y])
+
+    positions = np.array(positions)
+
+    plt.figure(figsize=(8, 8))
+    plt.scatter(positions[:, 0], positions[:, 1], s=1, alpha=0.5)
+    plt.xlabel('X (m)')
+    plt.ylabel('Y (m)')
+    plt.title('2-Link Arm Workspace')
+    plt.axis('equal')
+    plt.grid()
+    plt.show()
+```
+
+## Path Planning with IK
+
+### Trajectory Generation
+
+```python
+def generate_trajectory(start_pos, end_pos, steps=100):
+    """Generate linear interpolation trajectory."""
+    trajectory = []
+    for t in np.linspace(0, 1, steps):
+        pos = (1-t) * start_pos + t * end_pos
+        trajectory.append(pos)
+    return trajectory
+
+def trajectory_with_ik(start_pos, end_pos, ik_solver, steps=100):
+    """Generate trajectory with IK solutions at each step."""
+    trajectory_angles = []
+    current_angles = None
+
+    for target_pos in generate_trajectory(start_pos, end_pos, steps):
+        if current_angles is None:
+            initial_guess = None
+        else:
+            initial_guess = current_angles
+
+        angles, converged = ik_solver.solve(target_pos, initial_guess)
+
+        if converged:
+            trajectory_angles.append(angles)
+            current_angles = angles
+        else:
+            print(f"Warning: IK did not converge at {target_pos}")
+
+    return trajectory_angles
+```
+
+## Practical Example: Robot Arm Control
+
+```python
+class RobotArmController:
+    """Control robot arm to reach targets."""
+
+    def __init__(self, num_joints=3):
+        self.num_joints = num_joints
+        self.ik_solver = RobotIKSolver(fk_3link, num_joints)
+        self.current_angles = np.zeros(num_joints)
+
+    def move_to_position(self, target_pos, smooth=True, steps=50):
+        """Move arm to target position."""
+        if smooth:
+            # Generate smooth trajectory
+            current_pos = fk_3link(self.current_angles)
+            trajectory_pos = generate_trajectory(current_pos, target_pos, steps)
+
+            for pos in trajectory_pos:
+                solution, _ = self.ik_solver.solve(pos, self.current_angles)
+                self.current_angles = solution
+                self.execute_joint_angles(solution)
+
+        else:
+            # Direct move
+            solution, converged = self.ik_solver.solve(target_pos)
+            if converged:
+                self.current_angles = solution
+                self.execute_joint_angles(solution)
+            else:
+                print("Target unreachable")
+
+    def execute_joint_angles(self, angles):
+        """Send angles to robot motors."""
+        # Implementation depends on actual hardware
+        print(f"Moving to: {np.degrees(angles)}")
+
+    def get_current_position(self):
+        """Get current end-effector position."""
+        return fk_3link(self.current_angles)
+
+# Usage
+arm = RobotArmController(num_joints=3)
+target = np.array([1.2, 0.6, 0])
+arm.move_to_position(target, smooth=True)
+print(f"Reached: {arm.get_current_position()}")
+```
+
+## Summary Table
+
+| Concept | Purpose | When to Use |
+|---------|---------|------------|
+| Forward Kinematics | Calculate position from angles | Simulation, visualization |
+| Analytical IK | Exact solutions | Simple robots, real-time control |
+| Numerical IK | Approximate solutions | Complex robots, interactive control |
+| Jacobian | Sensitivity analysis | Singularity detection, stability |
+| DH Parameters | Standardize kinematics | Documentation, systematic analysis |
+
+## Key Formulas
+
+```
+Forward Kinematics (2D):
+x_ee = L1*cos(θ1) + L2*cos(θ1 + θ2)
+y_ee = L1*sin(θ1) + L2*sin(θ1 + θ2)
+
+Law of Cosines (for IK):
+cos(θ2) = (d² - L1² - L2²) / (2*L1*L2)
+
+Jacobian (numerical):
+J[i,j] = ∂f[i]/∂θ[j] ≈ (f(θ+δ*e_j) - f(θ)) / δ
+
+Damped LS:
+Δθ = (J^T*J + λ²*I)^-1 * J^T * e
+```
+
+## Next Steps
+
+You now have the mathematical and computational tools to control any robot! The next modules will explore advanced topics including vision-based control, machine learning for robotics, and building complete humanoid systems. You've completed the foundational knowledge of physical robotics—congratulations! Use what you've learned to build amazing robots!

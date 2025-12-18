@@ -1,0 +1,616 @@
+---
+id: chapter-6-actuators-control
+title: "Chapter 6: Actuators & Motor Control"
+description: "Learn about different types of robot actuators (motors, servos, pneumatics) and how to control them with proper wiring and programming."
+sidebar_position: 6
+module: 2
+part: 1
+chapter_index: 6
+learning_objectives:
+  - Understand DC motors, servo motors, and stepper motors
+  - Learn motor control with PWM and H-bridges
+  - Implement PID control for smooth movement
+  - Work with motor drivers and power electronics
+  - Control multiple motors simultaneously
+prerequisites: [5]
+keywords:
+  - Motors
+  - Servos
+  - Stepper motors
+  - PWM
+  - H-bridge
+  - PID control
+  - Motor drivers
+---
+
+# Chapter 6: Actuators & Motor Control
+
+## Introduction
+
+Actuators are the "muscles" of robots, converting electrical signals into mechanical movement. This chapter covers the most common actuators used in humanoid and mobile robots, and how to control them effectively.
+
+## Types of Actuators
+
+### DC Motors
+
+**Characteristics**
+- Continuous rotation
+- Speed proportional to voltage
+- Simple control with PWM
+- Power: 1-500W typical
+- Torque: Low to high
+- Price: $10-100
+
+**How DC Motors Work**
+```
+Motor circuit:
+    +5V ----[PWM Pin]---- Motor +
+    GND ---- Motor -
+
+Speed control: PWM duty cycle 0-100%
+Direction: Swap motor connections
+```
+
+**Example Circuit:**
+```
+Power Supply (+12V)
+    |
+    +---- [Relay/H-Bridge] ---- Motor +
+    |                           Motor -
+    +---- GND
+
+Arduino Pin (PWM) ---- H-Bridge Control
+```
+
+**Python Control (using motor driver module):**
+```python
+import RPi.GPIO as GPIO
+import time
+
+# Setup GPIO
+GPIO.setmode(GPIO.BCM)
+motor_pin = 17  # PWM pin
+direction_pin1 = 27
+direction_pin2 = 22
+
+GPIO.setup(motor_pin, GPIO.OUT)
+GPIO.setup(direction_pin1, GPIO.OUT)
+GPIO.setup(direction_pin2, GPIO.OUT)
+
+# Create PWM
+pwm = GPIO.PWM(motor_pin, 1000)  # 1kHz frequency
+pwm.start(0)  # 0% duty cycle
+
+def set_motor_speed(speed):
+    """
+    Set motor speed: -100 (reverse) to +100 (forward)
+    """
+    speed = max(-100, min(100, speed))  # Clamp
+
+    if speed > 0:
+        # Forward
+        GPIO.output(direction_pin1, GPIO.HIGH)
+        GPIO.output(direction_pin2, GPIO.LOW)
+    elif speed < 0:
+        # Reverse
+        GPIO.output(direction_pin1, GPIO.LOW)
+        GPIO.output(direction_pin2, GPIO.HIGH)
+    else:
+        # Stop
+        GPIO.output(direction_pin1, GPIO.LOW)
+        GPIO.output(direction_pin2, GPIO.LOW)
+
+    pwm.ChangeDutyCycle(abs(speed))
+
+# Usage
+set_motor_speed(50)   # 50% forward
+time.sleep(1)
+set_motor_speed(-75)  # 75% reverse
+time.sleep(1)
+set_motor_speed(0)    # Stop
+
+pwm.stop()
+GPIO.cleanup()
+```
+
+### Servo Motors
+
+**Characteristics**
+- Fixed range of motion (typically 0-180° or 0-270°)
+- Position control with feedback
+- Fast response
+- Power: 3-20W
+- Torque: 2-20 kg·cm
+- Price: $5-50
+
+**Servo Signal (PWM)**
+- Frequency: 50Hz (20ms period)
+- Pulse width: 1-2ms determines angle
+  - 1.0ms = 0° (minimum)
+  - 1.5ms = 90° (center)
+  - 2.0ms = 180° (maximum)
+
+**Wiring:**
+```
+Servo signal (orange/yellow) ---- GPIO PWM pin
+Servo power (red) --------------- +5V
+Servo ground (brown) ------------- GND
+```
+
+**Python Control:**
+```python
+import RPi.GPIO as GPIO
+import time
+
+GPIO.setmode(GPIO.BCM)
+servo_pin = 12  # PWM pin
+
+GPIO.setup(servo_pin, GPIO.OUT)
+servo_pwm = GPIO.PWM(servo_pin, 50)  # 50Hz for servo
+servo_pwm.start(0)
+
+def set_servo_angle(angle):
+    """
+    Set servo angle: 0-180 degrees
+    PWM duty cycle: 2.5% = 0°, 7.5% = 180°
+    """
+    angle = max(0, min(180, angle))  # Clamp to 0-180
+
+    # Calculate duty cycle
+    # 0° = 2.5%, 90° = 5%, 180° = 7.5%
+    duty_cycle = 2.5 + (angle / 180) * 5
+
+    servo_pwm.ChangeDutyCycle(duty_cycle)
+
+# Usage
+for angle in [0, 45, 90, 135, 180]:
+    set_servo_angle(angle)
+    print(f"Servo at {angle}°")
+    time.sleep(0.5)
+
+servo_pwm.stop()
+GPIO.cleanup()
+```
+
+### Stepper Motors
+
+**Characteristics**
+- Discrete angular steps (1.8° or 0.9° per step)
+- Precise position without feedback
+- Good torque at low speed
+- Power: 5-50W
+- Typical: 200-400 steps per revolution
+- Price: $10-50
+
+**How Steppers Work**
+```
+4-coil stepper motor:
+- Energize one coil at a time
+- Each energization rotates 1.8°
+- 200 steps for full rotation
+```
+
+**Wiring (NEMA 17 example):**
+```
+Coil A+ ---- Motor Driver Pin 1
+Coil A- ---- Motor Driver Pin 2
+Coil B+ ---- Motor Driver Pin 3
+Coil B- ---- Motor Driver Pin 4
+```
+
+**Python Control:**
+```python
+import RPi.GPIO as GPIO
+import time
+
+GPIO.setmode(GPIO.BCM)
+
+# Motor pins
+pins = [17, 27, 22, 23]
+
+for pin in pins:
+    GPIO.setup(pin, GPIO.OUT)
+    GPIO.output(pin, GPIO.LOW)
+
+def step_motor(steps, direction=1, speed=0.005):
+    """
+    Rotate stepper motor
+    steps: number of steps
+    direction: 1 (forward) or -1 (backward)
+    speed: delay between steps in seconds
+    """
+    # Coil activation pattern for 4-coil stepper
+    sequence = [
+        [1, 0, 0, 0],
+        [1, 1, 0, 0],
+        [0, 1, 0, 0],
+        [0, 1, 1, 0],
+        [0, 0, 1, 0],
+        [0, 0, 1, 1],
+        [0, 0, 0, 1],
+        [1, 0, 0, 1],
+    ]
+
+    for _ in range(steps):
+        for pattern in sequence[::direction]:
+            for i, pin in enumerate(pins):
+                GPIO.output(pin, pattern[i])
+            time.sleep(speed)
+
+# Usage
+step_motor(200, direction=1)   # Forward 1 revolution
+step_motor(200, direction=-1)  # Backward 1 revolution
+
+for pin in pins:
+    GPIO.output(pin, GPIO.LOW)
+GPIO.cleanup()
+```
+
+## Motor Control Circuits
+
+### H-Bridge (DC Motor Direction Control)
+
+```
+       +12V
+        |
+    +---+---+
+    |   |   |
+    Q1  |  Q3
+    +---+---+
+    |  | |  |
++---+--+M+--+---+
+|            |
+GND   Q2 Q4  GND
+    |  | |  |
+    +---+---+
+    |   |   |
+    Q2  |  Q4
+    +---+---+
+        |
+       GND
+
+Operation:
+Q1+Q4 ON:  Motor forward
+Q2+Q3 ON:  Motor reverse
+Q1+Q3 ON:  Motor stop (short circuit - BAD!)
+```
+
+### PWM Control
+
+**Pulse Width Modulation**
+```
+100% duty cycle:  ▔▔▔▔▔▔▔▔▔▔  (full voltage)
+75% duty cycle:   ▔▔▔▔░░░░░░  (75% speed)
+50% duty cycle:   ▔▔▔░░░░░░░░  (50% speed)
+25% duty cycle:   ▔░░░░░░░░░░  (25% speed)
+```
+
+**Arduino PWM:**
+```cpp
+// Arduino code for PWM
+const int motorPin = 3;  // PWM pin
+
+void setup() {
+    pinMode(motorPin, OUTPUT);
+}
+
+void loop() {
+    // Set motor to 50% speed
+    analogWrite(motorPin, 127);  // 0-255 scale
+    delay(1000);
+
+    // Set motor to 25% speed
+    analogWrite(motorPin, 64);
+    delay(1000);
+
+    // Stop
+    analogWrite(motorPin, 0);
+    delay(1000);
+}
+```
+
+## PID Control for Smooth Movement
+
+**PID (Proportional-Integral-Derivative) control** achieves smooth, accurate motor control:
+
+```python
+class PIDController:
+    """PID controller for motor speed regulation."""
+
+    def __init__(self, kp, ki, kd, setpoint=0):
+        """
+        kp: Proportional gain
+        ki: Integral gain
+        kd: Derivative gain
+        setpoint: Target value
+        """
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.setpoint = setpoint
+        self.integral_sum = 0
+        self.last_error = 0
+
+    def update(self, current_value, dt):
+        """
+        Calculate control output
+        current_value: Current sensor reading
+        dt: Time since last update (seconds)
+        """
+        # Error
+        error = self.setpoint - current_value
+
+        # Proportional term
+        p_term = self.kp * error
+
+        # Integral term (accumulate over time)
+        self.integral_sum += error * dt
+        i_term = self.ki * self.integral_sum
+
+        # Derivative term (rate of change)
+        d_term = 0
+        if dt > 0:
+            d_term = self.kd * (error - self.last_error) / dt
+        self.last_error = error
+
+        # Total output
+        output = p_term + i_term + d_term
+
+        # Clamp output to valid range
+        return max(-100, min(100, output))
+
+# Usage: Control motor speed to maintain 500 RPM
+pid = PIDController(kp=0.5, ki=0.1, kd=0.2, setpoint=500)
+
+import time
+
+last_time = time.time()
+
+for _ in range(1000):
+    current_time = time.time()
+    dt = current_time - last_time
+
+    # Simulate: read current motor speed
+    current_speed = 450  # RPM (from encoder)
+
+    # Calculate control signal
+    control = pid.update(current_speed, dt)
+
+    # Apply to motor
+    set_motor_speed(control)
+
+    last_time = current_time
+    time.sleep(0.01)  # 100Hz control loop
+```
+
+## Motor Specifications and Selection
+
+### Torque and Speed Trade-off
+
+```
+Power = Torque × Angular Velocity
+P = τ × ω
+
+Fixed power budget:
+- Higher speed → Lower torque
+- Lower speed → Higher torque
+
+Example:
+10W motor:
+- 100 RPM: 0.95 N·m
+- 200 RPM: 0.48 N·m
+- 500 RPM: 0.19 N·m
+```
+
+### Selecting Motors for Your Robot
+
+**For Humanoid Arm:**
+- Servo motors: 5-15 kg·cm torque, 0.1-0.2s speed
+- Position controlled joints
+
+**For Humanoid Legs:**
+- DC motors with gearbox: 10-100 kg·cm torque
+- Speed control for continuous motion
+
+**For Mobile Robot Wheels:**
+- Geared DC motors: 5-20 kg·cm
+- Both wheels same specs for symmetric motion
+
+### Motor Specifications Example
+
+```
+NEMA 17 Stepper Motor Specs:
+- Holding Torque: 3.2 kg·cm
+- Rated Current: 1.68A
+- Resistance: 1.65Ω
+- Inductance: 2.8mH
+- Steps per Revolution: 200
+- Weight: 340g
+
+Selection: Good for 3D printers, CNC, small humanoid arms
+```
+
+## Multiple Motor Control
+
+```python
+class MultiMotorController:
+    """Control multiple motors for humanoid robot."""
+
+    def __init__(self, num_joints):
+        self.num_joints = num_joints
+        self.motor_pins = list(range(num_joints))  # PWM pins
+        self.pid_controllers = [
+            PIDController(kp=0.5, ki=0.1, kd=0.2)
+            for _ in range(num_joints)
+        ]
+
+    def set_joint_targets(self, target_angles):
+        """Set target angles for all joints."""
+        for i, target in enumerate(target_angles):
+            self.pid_controllers[i].setpoint = target
+
+    def update_motors(self, current_angles, dt):
+        """Update all motors based on current angles."""
+        for i in range(self.num_joints):
+            control = self.pid_controllers[i].update(
+                current_angles[i], dt
+            )
+            # Apply control to motor i
+            self._set_motor_speed(i, control)
+
+    def _set_motor_speed(self, motor_index, speed):
+        """Internal method to set motor speed."""
+        pin = self.motor_pins[motor_index]
+        duty_cycle = abs(speed) / 100 * 255
+        # analogWrite(pin, duty_cycle)
+        pass
+
+# Usage for 6-joint humanoid arm
+arm_controller = MultiMotorController(6)
+
+# Set all joints to middle position
+target_angles = [90, 90, 90, 0, 0, 0]
+arm_controller.set_joint_targets(target_angles)
+
+# Control loop
+last_time = time.time()
+while True:
+    current_time = time.time()
+    dt = current_time - last_time
+
+    # Read current joint angles from encoders
+    current_angles = [45, 95, 85, 5, -2, 1]
+
+    # Update motors
+    arm_controller.update_motors(current_angles, dt)
+
+    last_time = current_time
+    time.sleep(0.01)
+```
+
+## Motor Driver Circuits
+
+### TB6612FNG Motor Driver
+
+**Pinout:**
+```
+VCC --- +5V logic supply
+GND --- Ground
+MOTORA+ --- Motor A+
+MOTORA- --- Motor A-
+MOTORB+ --- Motor B+
+MOTORB- --- Motor B-
+AIN1 --- Direction control A (GPIO)
+AIN2 --- Direction control A (GPIO)
+BIN1 --- Direction control B (GPIO)
+BIN2 --- Direction control B (GPIO)
+PWMA --- Speed control A (PWM)
+PWMB --- Speed control B (PWM)
+```
+
+**Connection Example:**
+```
+     +5V
+      |
+   [TB6612]
+   /  |  \
+MOTORA  |  MOTORB
+    AIN1=1  BIN1=1  (forward)
+    AIN2=0  BIN2=0
+    PWMA=PWM  PWMB=PWM
+```
+
+### L298N Motor Driver
+
+**Pinout:**
+```
++12V --- Power supply
+GND --- Ground
+OUT1/OUT2 --- Motor A
+OUT3/OUT4 --- Motor B
+IN1/IN2 --- Motor A direction
+IN3/IN4 --- Motor B direction
+ENA/ENB --- Speed PWM
+```
+
+## Practical Example: Mobile Robot Drive
+
+```python
+import time
+
+class DifferentialDriveRobot:
+    """Control a 2-wheel mobile robot."""
+
+    def __init__(self):
+        # Wheel constants
+        self.wheel_radius = 0.05  # meters
+        self.wheel_base = 0.2     # distance between wheels
+        self.max_speed = 1.0      # m/s
+
+    def drive_forward(self, speed):
+        """Drive forward at speed (0-1)."""
+        speed = max(0, min(1, speed))
+        set_motor_speed(0, speed * 100)   # Left wheel
+        set_motor_speed(1, speed * 100)   # Right wheel
+
+    def turn_in_place(self, angle_speed):
+        """Turn in place: -1 (CCW) to +1 (CW)."""
+        angle_speed = max(-1, min(1, angle_speed))
+        set_motor_speed(0, angle_speed * 100)   # Left wheel
+        set_motor_speed(1, -angle_speed * 100)  # Right wheel (opposite)
+
+    def drive_arc(self, linear_speed, angular_speed):
+        """
+        Drive in an arc with linear and angular velocity.
+        """
+        # Differential drive kinematic model
+        # v_left = v - (w * L) / 2
+        # v_right = v + (w * L) / 2
+
+        v = linear_speed * self.max_speed
+        w = angular_speed
+
+        v_left = v - (w * self.wheel_base) / 2
+        v_right = v + (w * self.wheel_base) / 2
+
+        # Normalize if exceeding max speed
+        max_v = max(abs(v_left), abs(v_right))
+        if max_v > self.max_speed:
+            v_left /= max_v / self.max_speed
+            v_right /= max_v / self.max_speed
+
+        # Apply to motors (0-1 normalized)
+        set_motor_speed(0, (v_left / self.max_speed) * 100)
+        set_motor_speed(1, (v_right / self.max_speed) * 100)
+
+# Usage
+robot = DifferentialDriveRobot()
+
+# Forward
+robot.drive_forward(0.5)
+time.sleep(2)
+
+# Turn
+robot.turn_in_place(0.3)
+time.sleep(2)
+
+# Arc
+robot.drive_arc(0.5, 0.2)
+time.sleep(2)
+
+# Stop
+robot.drive_forward(0)
+```
+
+## Summary Table
+
+| Actuator | Range | Speed | Torque | Control | Price |
+|----------|-------|-------|--------|---------|-------|
+| DC Motor | Continuous | 0-5000 RPM | Variable | PWM | $10-100 |
+| Servo | 0-270° | 0.1-0.2s | 5-20 kg·cm | PWM 50Hz | $5-50 |
+| Stepper | 1.8°/step | 0-1000 RPM | 3-30 kg·cm | Coil sequence | $10-50 |
+| Linear | 0-100mm | 1-100mm/s | 5-500N | PWM | $50-300 |
+
+## Next Steps
+
+Now that you can control motors and actuators, the next chapter will focus on describing robot structure using URDF files, which define the complete mechanical layout of your robot.

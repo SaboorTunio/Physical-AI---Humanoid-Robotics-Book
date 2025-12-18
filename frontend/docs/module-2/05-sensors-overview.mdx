@@ -1,0 +1,583 @@
+---
+id: chapter-5-sensors-overview
+title: "Chapter 5: Sensors Overview & Integration"
+description: "Learn about different robot sensors (cameras, LiDAR, IMU, touch sensors) and how to integrate them into your robot system."
+sidebar_position: 5
+module: 2
+part: 1
+chapter_index: 5
+learning_objectives:
+  - Understand different types of robot sensors
+  - Know sensor communication protocols (I2C, SPI, serial, CAN)
+  - Interface sensors with microcontrollers
+  - Process sensor data in real-time
+  - Simulate sensors in PyBullet
+prerequisites: [1, 4]
+keywords:
+  - Sensors
+  - I2C
+  - SPI
+  - Serial communication
+  - Camera
+  - IMU
+  - LiDAR
+---
+
+# Chapter 5: Sensors Overview & Integration
+
+## Introduction
+
+Sensors are the "eyes and ears" of robots, providing information about the robot's environment and internal state. This chapter covers the most common sensors used in robotics and how to integrate them into your systems.
+
+## Common Robot Sensors
+
+### Vision Sensors (Cameras)
+
+**USB Webcam**
+- Resolution: 720p to 4K
+- Interface: USB
+- Price: $20-100
+- Use: Object detection, gesture recognition
+
+**Intel RealSense**
+- Features: RGB + Depth
+- Resolution: 1280×720
+- Interface: USB 3.0
+- Price: $100-300
+- Use: 3D mapping, SLAM
+
+```python
+# Example: Using RealSense with Python
+# pip install pyrealsense2 opencv-python
+
+import cv2
+import numpy as np
+
+# Simple webcam capture
+cap = cv2.VideoCapture(0)  # 0 = default camera
+
+while True:
+    ret, frame = cap.read()
+
+    if not ret:
+        break
+
+    # Convert to grayscale for edge detection
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 100, 200)
+
+    # Display
+    cv2.imshow('Original', frame)
+    cv2.imshow('Edges', edges)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+```
+
+### Inertial Measurement Unit (IMU)
+
+**MPU-6050**
+- Accelerometer: 3-axis, ±16g
+- Gyroscope: 3-axis, ±2000°/s
+- Interface: I2C
+- Price: $5-10
+
+```python
+# Example: Reading MPU-6050 via I2C
+# pip install adafruit-circuitpython-mpu6050
+
+import board
+import busio
+import adafruit_mpu6050
+
+i2c = busio.I2C(board.SCL, board.SDA)
+sensor = adafruit_mpu6050.MPU6050(i2c)
+
+while True:
+    # Get acceleration (m/s²)
+    accel_x, accel_y, accel_z = sensor.acceleration
+
+    # Get angular velocity (rad/s)
+    gyro_x, gyro_y, gyro_z = sensor.gyro
+
+    print(f"Acceleration: ({accel_x:.2f}, {accel_y:.2f}, {accel_z:.2f})")
+    print(f"Gyro: ({gyro_x:.2f}, {gyro_y:.2f}, {gyro_z:.2f})")
+```
+
+### LiDAR (Light Detection and Ranging)
+
+**Sick TIM781**
+- Range: 0.1 - 25 m
+- Resolution: 270° FOV
+- Interface: Ethernet
+- Price: $1000+
+- Use: Mapping, obstacle avoidance
+
+**Low-Cost 2D LiDAR**
+- Range: 12 m
+- Resolution: 360° with 0.5° step
+- Interface: Serial/USB
+- Price: $50-200
+
+```python
+# Example: Reading simple 2D LiDAR via serial
+import serial
+import numpy as np
+
+ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
+
+def read_lidar_data():
+    """Read one scan from LiDAR."""
+    distances = []
+
+    while len(distances) < 360:  # 360 degree scan
+        line = ser.readline().decode('utf-8').strip()
+        try:
+            distance = float(line)
+            distances.append(distance)
+        except ValueError:
+            continue
+
+    return np.array(distances)
+
+def create_occupancy_grid(distances, grid_size=100):
+    """Convert LiDAR distances to occupancy grid."""
+    grid = np.zeros((grid_size, grid_size))
+
+    for angle, distance in enumerate(distances):
+        if distance > 0.1:  # Valid reading
+            # Convert polar to Cartesian
+            rad = np.radians(angle)
+            x = int(distance * np.cos(rad) + grid_size/2)
+            y = int(distance * np.sin(rad) + grid_size/2)
+
+            # Mark grid cell
+            if 0 <= x < grid_size and 0 <= y < grid_size:
+                grid[y, x] = 1
+
+    return grid
+
+# Read and process
+distances = read_lidar_data()
+grid = create_occupancy_grid(distances)
+```
+
+### Touch/Pressure Sensors
+
+**Force Sensitive Resistor (FSR)**
+- Range: 0-227g
+- Interface: Analog (ADC)
+- Price: $2-5
+
+**Capacitive Touch**
+- Integration: MPR121
+- Interface: I2C
+- Price: $5-15
+
+```python
+# Example: Reading FSR with Arduino via Serial
+import serial
+import time
+
+ser = serial.Serial('/dev/ttyACM0', 9600)  # Arduino port
+time.sleep(2)  # Wait for connection
+
+while True:
+    if ser.in_waiting > 0:
+        # Read analog value (0-1023)
+        analog_value = int(ser.readline().decode('utf-8').strip())
+
+        # Convert to force (rough calibration)
+        # FSR roughly: force_g = analog_value / 4
+        force_grams = analog_value / 4.0
+
+        print(f"Pressure: {force_grams:.1f}g")
+```
+
+### Ultrasonic Sensors
+
+**HC-SR04**
+- Range: 2 cm - 4 m
+- Accuracy: ±0.3 cm
+- Interface: Digital (GPIO)
+- Price: $2-5
+
+```python
+# Example: Reading HC-SR04 with Arduino
+import serial
+import time
+
+ser = serial.Serial('/dev/ttyACM0', 9600)
+time.sleep(2)
+
+while True:
+    if ser.in_waiting > 0:
+        distance_cm = float(ser.readline().decode('utf-8').strip())
+        print(f"Distance: {distance_cm:.1f} cm")
+```
+
+## Communication Protocols
+
+### I2C (Inter-Integrated Circuit)
+
+**Characteristics**
+- 2 wires: SDA (data), SCL (clock)
+- Speed: 100 kHz (standard), 400 kHz (fast)
+- Multiple devices on same bus
+- Pull-up resistors required
+
+**Wiring:**
+```
+Sensor SDA ---- Microcontroller SDA (with 4.7kΩ pull-up)
+Sensor SCL ---- Microcontroller SCL (with 4.7kΩ pull-up)
+Sensor GND ---- Microcontroller GND
+Sensor VCC ---- Microcontroller VCC (3.3V or 5V)
+```
+
+**Python Example:**
+```python
+import smbus
+
+bus = smbus.SMBus(1)  # Bus 1 for Raspberry Pi
+address = 0x68  # MPU-6050 I2C address
+
+# Read data from device
+data = bus.read_i2c_block_data(address, 0x3B, 6)
+```
+
+### SPI (Serial Peripheral Interface)
+
+**Characteristics**
+- 4 wires: MOSI, MISO, SCK, CS
+- Speed: 1-50 MHz typical
+- Single master, multiple slaves
+- Faster than I2C
+
+**Wiring:**
+```
+Sensor MOSI ---- Microcontroller MOSI
+Sensor MISO ---- Microcontroller MISO
+Sensor SCK ----- Microcontroller SCK
+Sensor CS ------ Microcontroller CS (GPIO)
+Sensor GND ----- Microcontroller GND
+Sensor VCC ----- Microcontroller VCC
+```
+
+**Python Example:**
+```python
+import spidev
+import time
+
+spi = spidev.SpiDev()
+spi.open(0, 0)  # Bus 0, Device 0
+spi.max_speed_hz = 1000000  # 1 MHz
+
+# Write data
+spi.writebytes([0x80, 0x01])
+
+# Read data
+data = spi.readbytes(2)
+
+spi.close()
+```
+
+### Serial (UART)
+
+**Characteristics**
+- 2 wires: TX, RX
+- Speed: 300 - 115200 bps
+- Point-to-point communication
+- Simple and reliable
+
+**Wiring:**
+```
+Sensor TX ----- Microcontroller RX
+Sensor RX ----- Microcontroller TX
+Sensor GND ---- Microcontroller GND
+```
+
+**Python Example:**
+```python
+import serial
+
+ser = serial.Serial(
+    port='/dev/ttyUSB0',
+    baudrate=115200,
+    timeout=1
+)
+
+while True:
+    if ser.in_waiting > 0:
+        line = ser.readline().decode('utf-8').strip()
+        print(f"Received: {line}")
+
+    # Send data
+    ser.write(b"Hello\n")
+
+ser.close()
+```
+
+## Sensor Data Processing
+
+### Noise Filtering
+
+**Moving Average:**
+```python
+class MovingAveragFilter:
+    """Simple moving average filter."""
+
+    def __init__(self, window_size=5):
+        self.window_size = window_size
+        self.values = []
+
+    def filter(self, value):
+        """Apply filter and return smoothed value."""
+        self.values.append(value)
+        if len(self.values) > self.window_size:
+            self.values.pop(0)
+        return sum(self.values) / len(self.values)
+
+# Usage
+filter = MovingAveragFilter(window_size=5)
+for raw_sensor_reading in sensor_data_stream:
+    smooth_value = filter.filter(raw_sensor_reading)
+    print(f"Smoothed: {smooth_value}")
+```
+
+**Kalman Filter (for IMU):**
+```python
+import numpy as np
+
+class KalmanFilter1D:
+    """1D Kalman filter for sensor fusion."""
+
+    def __init__(self, q, r, x=0.0, p=1.0, a=1.0, h=1.0):
+        """
+        q: process noise
+        r: measurement noise
+        x: initial state
+        p: initial covariance
+        a: state transition
+        h: measurement transition
+        """
+        self.q = q
+        self.r = r
+        self.x = x
+        self.p = p
+        self.a = a
+        self.h = h
+
+    def update(self, z):
+        """Update filter with measurement."""
+        # Predict
+        x_pred = self.a * self.x
+        p_pred = self.a * self.p * self.a + self.q
+
+        # Update
+        y = z - self.h * x_pred
+        s = self.h * p_pred * self.h + self.r
+        k = p_pred * self.h / s
+
+        self.x = x_pred + k * y
+        self.p = (1 - k * self.h) * p_pred
+
+        return self.x
+
+# Usage
+kf = KalmanFilter1D(q=0.01, r=0.1)
+filtered_values = [kf.update(z) for z in raw_measurements]
+```
+
+## Simulating Sensors in PyBullet
+
+### Simulating Range Sensors
+
+```python
+import pybullet as p
+import pybullet_data
+import numpy as np
+
+client = p.connect(p.GUI)
+p.setGravity(0, 0, -9.81)
+p.setAdditionalSearchPath(pybullet_data.getDataPath())
+
+plane = p.loadURDF("plane.urdf")
+robot = p.loadURDF("r2d2.urdf", [0, 0, 1])
+
+# Create obstacle
+obstacle = p.loadURDF("cube_small.urdf", [2, 0, 0.5])
+
+def simulate_rangefinder(origin, direction, max_distance=10):
+    """Simulate a simple rangefinder/LiDAR."""
+    # Cast a ray
+    result = p.rayTestBatch(
+        [[origin[0], origin[1], origin[2]]],
+        [[origin[0] + direction[0]*max_distance,
+          origin[1] + direction[1]*max_distance,
+          origin[2] + direction[2]*max_distance]]
+    )
+
+    # Return distance to first hit
+    if result[0][0] != -1:  # Hit something
+        return result[0][2] * max_distance
+    else:
+        return max_distance
+
+# Simulate
+for step in range(1000):
+    p.stepSimulation()
+
+    # Get robot position
+    pos, _ = p.getBasePositionAndOrientation(robot)
+
+    # Simulate 4 rangefinders (front, back, left, right)
+    distances = [
+        simulate_rangefinder(pos, [1, 0, 0]),   # Front
+        simulate_rangefinder(pos, [-1, 0, 0]),  # Back
+        simulate_rangefinder(pos, [0, 1, 0]),   # Left
+        simulate_rangefinder(pos, [0, -1, 0]),  # Right
+    ]
+
+    if step % 100 == 0:
+        print(f"Distances (F,B,L,R): {distances}")
+
+p.disconnect()
+```
+
+### Simulating IMU
+
+```python
+import pybullet as p
+import numpy as np
+
+def simulate_imu(robot_id):
+    """Simulate IMU by reading PyBullet physics data."""
+    # Get base velocity (linear and angular)
+    lin_vel, ang_vel = p.getBaseVelocity(robot_id)
+
+    # Get base position and orientation
+    pos, orn = p.getBasePositionAndOrientation(robot_id)
+
+    # Rotation matrix from quaternion
+    R = np.array(p.getMatrixFromQuaternion(orn)).reshape(3, 3)
+
+    # Gravity vector in world frame
+    gravity_world = np.array([0, 0, 9.81])
+
+    # Transform gravity to robot frame
+    gravity_robot = R.T @ gravity_world
+
+    # IMU reading (acceleration = gravity + dynamics)
+    accel = -gravity_robot
+
+    # Angular velocity (already in robot frame for simple case)
+    gyro = np.array(ang_vel)
+
+    return accel, gyro
+
+# Usage
+for _ in range(1000):
+    p.stepSimulation()
+    accel, gyro = simulate_imu(robot)
+    print(f"Accel: {accel}, Gyro: {gyro}")
+```
+
+## Sensor Mounting Points
+
+### Typical Sensor Locations
+
+**On Humanoid Head:**
+- Stereo cameras: Forward-facing for vision
+- IMU: Center for balance
+- Microphone: For audio
+
+**On Humanoid Torso:**
+- Force/Torque sensors: In joints for load sensing
+- Temperature sensors: For battery/motor monitoring
+
+**On Humanoid Hands:**
+- Touch sensors: On fingers for grasping
+- Force sensors: In palm for grip strength
+
+**On Quadruped Body:**
+- LiDAR: Top for mapping
+- IMU: Center for stability
+- Bump sensors: Front for collision
+
+## Practical Example: Multi-Sensor System
+
+```python
+import numpy as np
+from collections import deque
+
+class RobotSensorFusion:
+    """Fuse multiple sensor readings."""
+
+    def __init__(self):
+        self.imu_data = deque(maxlen=10)
+        self.camera_data = None
+        self.distance_data = deque(maxlen=4)
+        self.filter = KalmanFilter1D(q=0.01, r=0.1)
+
+    def add_imu_reading(self, accel, gyro):
+        """Add IMU data."""
+        self.imu_data.append({'accel': accel, 'gyro': gyro})
+
+    def add_camera_frame(self, frame):
+        """Add camera image."""
+        self.camera_data = frame
+
+    def add_distance_readings(self, distances):
+        """Add rangefinder data."""
+        self.distance_data.append(distances)
+
+    def get_robot_state(self):
+        """Fuse all sensor data."""
+        if not self.imu_data:
+            return None
+
+        # Average accelerations
+        accel_avg = np.mean(
+            [d['accel'] for d in self.imu_data],
+            axis=0
+        )
+
+        # Average distances
+        if self.distance_data:
+            dist_avg = np.mean(list(self.distance_data), axis=0)
+        else:
+            dist_avg = None
+
+        return {
+            'acceleration': accel_avg,
+            'camera': self.camera_data,
+            'distances': dist_avg,
+            'timestamp': np.datetime64('now')
+        }
+
+# Usage
+sensor_system = RobotSensorFusion()
+sensor_system.add_imu_reading([0.1, 0.0, 9.8], [0.01, -0.01, 0.0])
+sensor_system.add_distance_readings([1.5, 2.0, 1.8, 2.1])
+
+state = sensor_system.get_robot_state()
+print(f"Robot state: {state}")
+```
+
+## Summary Table
+
+| Sensor | Type | Range | Interface | Price |
+|--------|------|-------|-----------|-------|
+| Camera | Vision | - | USB/CSI | $20-300 |
+| IMU | Inertial | ±16g | I2C | $5-50 |
+| LiDAR | Range | 25m | Ethernet | $50-1000+ |
+| FSR | Touch | 0-227g | Analog | $2-5 |
+| Ultrasonic | Range | 4m | GPIO | $2-5 |
+| Gyroscope | Rotation | ±2000°/s | I2C | $5-20 |
+
+## Next Steps
+
+Now that you understand sensors, the next chapter covers actuators—the motors and mechanisms that enable robots to move and interact with their environment.
