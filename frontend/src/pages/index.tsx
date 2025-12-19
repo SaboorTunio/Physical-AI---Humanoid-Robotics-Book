@@ -103,28 +103,28 @@ function QuickStartSection() {
           🚀 Quick Start Guide
         </Heading>
         <div className={clsx('row', styles.stepsRow)}>
-          <div className={clsx('col col--6', styles.stepCol)}>
+          <div className={clsx('col col--12 col--md--6 padding-vert--sm', styles.stepCol)}>
             <div className={styles.step}>
               <div className={styles.stepNumber}>1</div>
               <Heading as="h3">Choose Your Module</Heading>
               <p>Start with <strong>Module 1: Foundations</strong> if you're new to robotics, or jump to any module that interests you most.</p>
             </div>
           </div>
-          <div className={clsx('col col--6', styles.stepCol)}>
+          <div className={clsx('col col--12 col--md--6 padding-vert--sm', styles.stepCol)}>
             <div className={styles.step}>
               <div className={styles.stepNumber}>2</div>
               <Heading as="h3">Follow the Curriculum</Heading>
               <p>Each chapter includes learning objectives, core concepts, code examples, hands-on exercises, and prerequisites.</p>
             </div>
           </div>
-          <div className={clsx('col col--6', styles.stepCol)}>
+          <div className={clsx('col col--12 col--md--6 padding-vert--sm', styles.stepCol)}>
             <div className={styles.step}>
               <div className={styles.stepNumber}>3</div>
               <Heading as="h3">Use the AI Assistant</Heading>
               <p>Highlight text and ask questions for context-aware answers, or ask general questions about any topic in the textbook.</p>
             </div>
           </div>
-          <div className={clsx('col col--6', styles.stepCol)}>
+          <div className={clsx('col col--12 col--md--6 padding-vert--sm', styles.stepCol)}>
             <div className={styles.step}>
               <div className={styles.stepNumber}>4</div>
               <Heading as="h3">Track Progress</Heading>
@@ -187,7 +187,7 @@ export default function Home(): JSX.Element {
             </p>
             <div className={clsx('row', styles.moduleRow)}>
               {ModulesList.map((props, idx) => (
-                <div key={idx} className={clsx('col col--6', styles.moduleCol)}>
+                <div key={idx} className={clsx('col col--12 col--md--6 padding-vert--sm', styles.moduleCol)}>
                   <ModuleCard {...props} />
                 </div>
               ))}
