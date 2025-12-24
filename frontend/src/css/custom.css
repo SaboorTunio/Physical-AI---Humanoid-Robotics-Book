@@ -7,7 +7,7 @@
 .navbar__title {
   font-size: 1.25rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  background: linear-gradient(135deg, #9c04c6 0%, #b206e1 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -15,7 +15,7 @@
 }
 
 [data-theme='dark'] .navbar__title {
-  background: linear-gradient(135deg, #60a5fa 0%, #93c5fd 100%);
+  background: linear-gradient(135deg, #a816d0 0%, #8114e1 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -54,7 +54,7 @@ code {
 }
 
 pre {
-  background-color: #f6f8fa;
+  background-color: #fdfbfd;
 }
 
 [data-theme='dark'] pre {
