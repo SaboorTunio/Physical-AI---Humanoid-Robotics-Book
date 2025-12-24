@@ -1,0 +1,35 @@
+name: Book Ingestion
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  ingest-book:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run book ingestion
+      run: |
+        cd backend
+        python ingest_book.py
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        QDRANT_URL: ${{ secrets.QDRANT_URL }}
+        QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+        QDRANT_COLLECTION_NAME: ${{ secrets.QDRANT_COLLECTION_NAME }}
+        QDRANT_VECTOR_SIZE: ${{ secrets.QDRANT_VECTOR_SIZE }}
