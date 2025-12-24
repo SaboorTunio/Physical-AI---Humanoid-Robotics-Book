@@ -20,15 +20,14 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@docusaurus/core": "^3.9.2",
-    "@docusaurus/preset-classic": "^3.9.2",
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
-    "axios": "^1.13.2",
+    "@docusaurus/core": "^3.6.3",
+    "@docusaurus/preset-classic": "^3.6.3",
+    "@types/react": "^19.2.1",
+    "@types/react-dom": "^19.2.1",
+    "axios": "^1.7.9",
     "clsx": "^2.1.1",
-    "docusaurus": "^1.14.7",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "typescript": "^5.9.3"
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "typescript": "^5.7.3"
   }
 }
