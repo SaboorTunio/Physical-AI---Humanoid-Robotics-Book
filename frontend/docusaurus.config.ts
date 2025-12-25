@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename);
 const config: Config = {
   title: 'Physical AI & Humanoid Robotics Textbook',
   tagline: 'Interactive Learning with AI Teaching Assistant',
+  favicon: '/img/favicon.svg',
 
   // Set the production url of your site here
   url: 'https://giaic-hackathone.github.io',
@@ -64,6 +65,10 @@ const config: Config = {
 
   themes: ['@docusaurus/theme-live-codeblock'],
   themeConfig: {
+    metadata: [
+      {name: 'keywords', content: 'robotics, AI, textbook, education, humanoid robotics'},
+      {name: 'theme-color', content: '#2563eb'},
+    ],
     navbar: {
       title: 'Physical AI & Humanoid Robotics Textbook',
       items: [
