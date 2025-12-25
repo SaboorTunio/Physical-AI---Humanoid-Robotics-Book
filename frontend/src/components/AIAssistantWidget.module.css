@@ -117,7 +117,7 @@
 }
 
 [data-theme='dark'] .messages {
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(255, 255, 255, 1);
 }
 
 .messages::-webkit-scrollbar {
@@ -232,9 +232,15 @@
 }
 
 [data-theme='dark'] .message.assistant .messageContent {
-  background: rgba(37, 99, 235, 0.1);
-  color: rgba(255, 255, 255, 0.95);
+  background: rgba(37, 99, 235, 0.25);
+  color: rgba(255, 255, 255, 1);
   border-color: rgba(37, 99, 235, 0.3);
+}
+
+[data-theme='dark'] .message.user .messageContent {
+  background: #3b82f6;
+  color: white;
+  border-radius: 16px 4px 16px 16px;
 }
 
 .sources {
