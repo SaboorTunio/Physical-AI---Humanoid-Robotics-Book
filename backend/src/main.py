@@ -62,18 +62,26 @@ async def health_check():
 
 
 @app.post("/api/chat")
-async def chat_endpoint(query: str, max_context_chunks: int = 5):
+async def chat_endpoint(request: dict):
     """
     Chat endpoint that receives a user query, searches Qdrant for context,
     and sends the prompt to OpenAI to get an answer.
 
     Args:
-        query: User's question/query
-        max_context_chunks: Maximum number of context chunks to retrieve from Qdrant
+        request: Dictionary containing query and optional parameters
+            - query: User's question/query
+            - chapter_context: Optional chapter index for context
+            - highlighted_context: Optional highlighted text from textbook
+            - max_context_chunks: Maximum number of context chunks to retrieve from Qdrant (default: 5)
 
     Returns:
         dict: Response containing the answer and source information
     """
+    query = request.get("query", "")
+    chapter_context = request.get("chapter_context")
+    highlighted_context = request.get("highlighted_context")
+    max_context_chunks = request.get("max_context_chunks", 5)
+
     if not query or not query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
@@ -93,7 +101,7 @@ async def chat_endpoint(query: str, max_context_chunks: int = 5):
             return {
                 "query": query,
                 "answer": "I couldn't find relevant information in the textbook to answer your question.",
-                "sources": [],
+                "sources": [f"Chapter {chapter_context}"] if chapter_context else [],
                 "context_chunks": 0
             }
 
@@ -111,6 +119,10 @@ async def chat_endpoint(query: str, max_context_chunks: int = 5):
 
         # Combine all context parts
         context = "\n\n".join(context_parts)
+
+        # Include highlighted context if provided
+        if highlighted_context:
+            context = f"Highlighted text for context: {highlighted_context}\n\n{context}"
 
         # Create system prompt for the AI
         system_prompt = f"""
