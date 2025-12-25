@@ -114,10 +114,12 @@
   flex-direction: column;
   gap: 12px;
   color: rgba(0, 0, 0, 0.9);
+  background: white;
 }
 
 [data-theme='dark'] .messages {
   color: rgba(255, 255, 255, 1);
+  background: #1a1a1a;
 }
 
 .messages::-webkit-scrollbar {
@@ -232,15 +234,15 @@
 }
 
 [data-theme='dark'] .message.assistant .messageContent {
-  background: #2d3748 !important;
-  color: white !important;
-  border-color: #4a5568 !important;
+  background: #2d3748;
+  color: white;
+  border-color: #4a5568;
 }
 
 [data-theme='dark'] .message.user .messageContent {
-  background: #3b82f6 !important;
-  color: white !important;
-  border-radius: 16px 4px 16px 16px !important;
+  background: #3b82f6;
+  color: white;
+  border-radius: 16px 4px 16px 16px;
 }
 
 .sources {
@@ -253,6 +255,7 @@
 
 [data-theme='dark'] .sources {
   color: rgba(255, 255, 255, 1);
+  border-top-color: rgba(255, 255, 255, 0.2);
 }
 
 .sources strong {
@@ -274,10 +277,12 @@
   border-radius: 4px;
   font-size: 10px;
   font-weight: 500;
+  color: rgba(0, 0, 0, 0.8);
 }
 
 [data-theme='dark'] .source {
   background: rgba(37, 99, 235, 0.3);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .typing {
@@ -325,6 +330,7 @@
 
 [data-theme='dark'] .inputForm {
   background: rgba(30, 30, 30, 0.5);
+  border-top-color: rgba(255, 255, 255, 0.1);
 }
 
 .input {
